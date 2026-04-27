@@ -1,0 +1,1262 @@
+[
+  {
+    "id": "CVE-2001-0054",
+    "cwe": "CWE-22",
+    "description": "Directory traversal vulnerability in FTP Serv-U before 2.5i allows remote attackers to escape the FTP root and read arbitrary files by appending a string such as \"/..%20.\" to a CD command, a variant of a .. (dot dot) attack.",
+    "cvss_score": 5.0,
+    "published": "2001-02-16T05:00:00.000"
+  },
+  {
+    "id": "CVE-2001-0925",
+    "cwe": "CWE-22",
+    "description": "The default installation of Apache before 1.3.19 allows remote attackers to list directories instead of the multiview index.html file via an HTTP request for a path that contains many / (slash) characters, which causes the path to be mishandled by (1) mod_negotiation, (2) mod_dir, or (3) mod_autoindex.",
+    "cvss_score": 5.0,
+    "published": "2001-03-12T05:00:00.000"
+  },
+  {
+    "id": "CVE-2001-0780",
+    "cwe": "CWE-22",
+    "description": "Directory traversal vulnerability in cosmicpro.cgi in Cosmicperl Directory Pro 2.0 allows remote attackers to gain sensitive information via a .. (dot dot) in the SHOW parameter.",
+    "cvss_score": 5.0,
+    "published": "2001-10-18T04:00:00.000"
+  },
+  {
+    "id": "CVE-2001-1432",
+    "cwe": "CWE-22",
+    "description": "Directory traversal vulnerability in Cherokee Web Server allows remote attackers to read arbitrary files via a .. (dot dot) in the URL.",
+    "cvss_score": 7.8,
+    "published": "2001-12-29T05:00:00.000"
+  },
+  {
+    "id": "CVE-2001-1205",
+    "cwe": "CWE-22",
+    "description": "Directory traversal vulnerability in lastlines.cgi for Last Lines 2.0 allows remote attackers to read arbitrary files via '..' sequences in the $error_log variable.",
+    "cvss_score": 5.0,
+    "published": "2001-12-30T05:00:00.000"
+  },
+  {
+    "id": "CVE-2002-2154",
+    "cwe": "CWE-22",
+    "description": "Directory traversal vulnerability in Monkey HTTP Daemon 0.1.4 allows remote attackers to read arbitrary files via .. (dot dot) sequences.",
+    "cvss_score": 5.0,
+    "published": "2002-12-31T05:00:00.000"
+  },
+  {
+    "id": "CVE-2002-2229",
+    "cwe": "CWE-22",
+    "description": "Directory traversal vulnerability in Sapio Design Ltd. WebReflex 1.53 allows remote attackers to read arbitrary files via a .. in an HTTP request.",
+    "cvss_score": 5.0,
+    "published": "2002-12-31T05:00:00.000"
+  },
+  {
+    "id": "CVE-2002-2233",
+    "cwe": "CWE-22",
+    "description": "Directory traversal vulnerability in Enceladus Server Suite 3.9 allows remote attackers to list arbitrary directories and possibly cause a denial of service via \"@\" (at) characters in a CD (CWD) command, such as (1) \"@/....\\\", (2) \"@@@/..c:\\\", or (3) \"@/..@/..\".",
+    "cvss_score": 8.3,
+    "published": "2002-12-31T05:00:00.000"
+  },
+  {
+    "id": "CVE-2002-2238",
+    "cwe": "CWE-22",
+    "description": "Directory traversal vulnerability in the Kunani ODBC FTP Server 1.0.10 allows remote attackers to read arbitrary files via a \"..\\\" (dot dot backslash) in a GET request.",
+    "cvss_score": 5.0,
+    "published": "2002-12-31T05:00:00.000"
+  },
+  {
+    "id": "CVE-2002-2240",
+    "cwe": "CWE-22",
+    "description": "Directory traversal vulnerability in MyServer 0.11 and 0.2 allows remote attackers to read arbitrary files via a \"..\" (dot dot) in an HTTP GET request.",
+    "cvss_score": 5.0,
+    "published": "2002-12-31T05:00:00.000"
+  },
+  {
+    "id": "CVE-2002-2256",
+    "cwe": "CWE-22",
+    "description": "Directory traversal vulnerability in pWins Webserver 0.2.5 and earlier allows remote attackers to read arbitrary files via Unicode characters.",
+    "cvss_score": 5.0,
+    "published": "2002-12-31T05:00:00.000"
+  },
+  {
+    "id": "CVE-2002-2269",
+    "cwe": "CWE-22",
+    "description": "Directory traversal vulnerability in Webster HTTP Server allows remote attackers to read arbitrary files via a .. (dot dot) in the URL.",
+    "cvss_score": 9.4,
+    "published": "2002-12-31T05:00:00.000"
+  },
+  {
+    "id": "CVE-2002-2292",
+    "cwe": "CWE-22",
+    "description": "Directory traversal vulnerability in Remote Console Applet in Halycon Software iASP 1.0.9 allows remote attackers to read arbitrary files via a .. (dot dot) in the HTTP request to port 9095.",
+    "cvss_score": 5.0,
+    "published": "2002-12-31T05:00:00.000"
+  },
+  {
+    "id": "CVE-2002-2351",
+    "cwe": "CWE-22",
+    "description": "Eudora 5.1 allows remote attackers to bypass security warnings and possibly execute arbitrary code via attachments with names containing a trailing \".\" (dot).",
+    "cvss_score": 6.4,
+    "published": "2002-12-31T05:00:00.000"
+  },
+  {
+    "id": "CVE-2002-2375",
+    "cwe": "CWE-22",
+    "description": "Directory traversal vulnerability in CommuniGate Pro 4.0b4 and possibly earlier versions allows remote attackers to list the contents of the WebUser directory and its parent directory via a (1) .. (dot dot) or (2) . (dot) in a URL.  NOTE: it is not clear whether this issue reveals any more information regarding directory structure than is already available to any CommuniGate Pro user, although there is a possibility that it could be used to infer product version information.",
+    "cvss_score": 5.0,
+    "published": "2002-12-31T05:00:00.000"
+  },
+  {
+    "id": "CVE-2002-2387",
+    "cwe": "CWE-22",
+    "description": "Directory traversal vulnerability in Hyperion FTP server 2.8.1 allows remote attackers to read arbitrary files via a .. (dot dot) in the LS command.",
+    "cvss_score": 5.0,
+    "published": "2002-12-31T05:00:00.000"
+  },
+  {
+    "id": "CVE-2002-2399",
+    "cwe": "CWE-22",
+    "description": "Directory traversal vulnerability in viewAttachment.cgi in W3Mail 1.0.6 allows remote attackers to read arbitrary files via a .. (dot dot) in the file parameter.",
+    "cvss_score": 6.4,
+    "published": "2002-12-31T05:00:00.000"
+  },
+  {
+    "id": "CVE-2002-2403",
+    "cwe": "CWE-22",
+    "description": "Directory traversal vulnerability in KeyFocus web server 1.0.8 allows remote attackers to read arbitrary files for recognized MIME type files via \"...\", \"....\", \".....\", and other multiple dot sequences.",
+    "cvss_score": 5.0,
+    "published": "2002-12-31T05:00:00.000"
+  },
+  {
+    "id": "CVE-2002-2416",
+    "cwe": "CWE-22",
+    "description": "Directory traversal vulnerability in Zeroo web server 1.5 allows remote attackers to read arbitrary files via a .. (dot dot) in a URL GET request.",
+    "cvss_score": 5.0,
+    "published": "2002-12-31T05:00:00.000"
+  },
+  {
+    "id": "CVE-2003-1335",
+    "cwe": "CWE-22",
+    "description": "Directory traversal vulnerability in Kai Blankenhorn Bitfolge simple and nice index file (aka snif) before 1.2.5 allows remote attackers to download files from locations above the snif directory.",
+    "cvss_score": 5.0,
+    "published": "2003-12-31T05:00:00.000"
+  },
+  {
+    "id": "CVE-2000-1139",
+    "cwe": "CWE-798",
+    "description": "The installation of Microsoft Exchange 2000 before Rev. A creates a user account with a known password, which could allow attackers to gain privileges, aka the \"Exchange User Account\" vulnerability.",
+    "cvss_score": 7.5,
+    "published": "2001-01-09T05:00:00.000"
+  },
+  {
+    "id": "CVE-2005-0496",
+    "cwe": "CWE-798",
+    "description": "Arkeia Network Backup Client 5.x contains hard-coded credentials that effectively serve as a back door, which allows remote attackers to access the file system and possibly execute arbitrary commands.",
+    "cvss_score": 9.8,
+    "published": "2005-02-21T05:00:00.000"
+  },
+  {
+    "id": "CVE-2005-3716",
+    "cwe": "CWE-798",
+    "description": "The SNMP daemon in UTStarcom F1000 VOIP WIFI Phone s2.0 running VxWorks 5.5.1 with kernel WIND 2.6 has hard-coded public credentials that cannot be changed, which allows attackers to obtain sensitive information.",
+    "cvss_score": 7.5,
+    "published": "2005-11-21T11:03:00.000"
+  },
+  {
+    "id": "CVE-2005-3803",
+    "cwe": "CWE-798",
+    "description": "Cisco IP Phone (VoIP) 7920 1.0(8) contains certain hard-coded (\"fixed\") public and private SNMP community strings that cannot be changed, which allows remote attackers to obtain sensitive information.",
+    "cvss_score": 7.5,
+    "published": "2005-11-24T11:03:00.000"
+  },
+  {
+    "id": "CVE-2007-1063",
+    "cwe": "CWE-798",
+    "description": "The SSH server in Cisco Unified IP Phone 7906G, 7911G, 7941G, 7961G, 7970G, and 7971G, with firmware 8.0(4)SR1 and earlier, uses a hard-coded username and password, which allows remote attackers to access the device.",
+    "cvss_score": 10.0,
+    "published": "2007-02-22T01:28:00.000"
+  },
+  {
+    "id": "CVE-2006-7074",
+    "cwe": "CWE-798",
+    "description": "admin.php in SmartSiteCMS 1.0 allows remote attackers to bypass authentication and gain administrator privileges by setting the userName cookie.",
+    "cvss_score": 7.5,
+    "published": "2007-03-02T21:18:00.000"
+  },
+  {
+    "id": "CVE-2006-7142",
+    "cwe": "CWE-798",
+    "description": "The centralized management feature for Utimaco Safeguard stores hard-coded cryptographic keys in executable programs for encrypted configuration files, which allows attackers to recover the keys from the configuration files and decrypt the disk drive.",
+    "cvss_score": 7.8,
+    "published": "2007-03-07T20:19:00.000"
+  },
+  {
+    "id": "CVE-2008-1160",
+    "cwe": "CWE-798",
+    "description": "ZyXEL ZyWALL 1050 has a hard-coded password for the Quagga and Zebra processes that is not changed when it is set by a user, which allows remote attackers to gain privileges.",
+    "cvss_score": 9.8,
+    "published": "2008-03-25T00:44:00.000"
+  },
+  {
+    "id": "CVE-2008-0961",
+    "cwe": "CWE-798",
+    "description": "EMV DiskXtender 6.20.060 has a hard-coded login and password, which allows remote attackers to bypass authentication via the RPC interface.",
+    "cvss_score": 9.8,
+    "published": "2008-04-14T16:05:00.000"
+  },
+  {
+    "id": "CVE-2008-2369",
+    "cwe": "CWE-798",
+    "description": "manzier.pxt in Red Hat Network Satellite Server before 5.1.1 has a hard-coded authentication key, which allows remote attackers to connect to the server and obtain sensitive information about user accounts and entitlements.",
+    "cvss_score": 9.1,
+    "published": "2008-08-14T20:41:00.000"
+  },
+  {
+    "id": "CVE-2010-1573",
+    "cwe": "CWE-798",
+    "description": "Linksys WAP54Gv3 firmware 3.04.03 and earlier uses a hard-coded username (Gemtek) and password (gemtekswd) for a debug interface for certain web pages, which allows remote attackers to execute arbitrary commands via the (1) data1, (2) data2, or (3) data3 parameters to (a) Debug_command_page.asp and (b) debug.cgi.",
+    "cvss_score": 9.8,
+    "published": "2010-06-10T00:30:07.503"
+  },
+  {
+    "id": "CVE-2010-2073",
+    "cwe": "CWE-798",
+    "description": "auth_db_config.py in Pyftpd 0.8.4 contains hard-coded usernames and passwords for the (1) test, (2) user, and (3) roxon accounts, which allows remote attackers to read arbitrary files from the FTP server.",
+    "cvss_score": 7.5,
+    "published": "2010-06-16T20:30:02.577"
+  },
+  {
+    "id": "CVE-2010-2772",
+    "cwe": "CWE-798",
+    "description": "Siemens Simatic WinCC and PCS 7 SCADA system uses a hard-coded password, which allows local users to access a back-end database and gain privileges, as demonstrated in the wild in July 2010 by the Stuxnet worm, a different vulnerability than CVE-2010-2568.",
+    "cvss_score": 7.8,
+    "published": "2010-07-22T05:43:58.250"
+  },
+  {
+    "id": "CVE-2012-3503",
+    "cwe": "CWE-798",
+    "description": "The installation script in Katello 1.0 and earlier does not properly generate the Application.config.secret_token value, which causes each default installation to have the same secret token, and allows remote attackers to authenticate to the CloudForms System Engine web interface as an arbitrary user by creating a cookie using the default secret_token.",
+    "cvss_score": 9.8,
+    "published": "2012-08-25T10:29:52.693"
+  },
+  {
+    "id": "CVE-2012-4712",
+    "cwe": "CWE-798",
+    "description": "Moxa EDR-G903 series routers with firmware before 2.11 have a hardcoded account, which allows remote attackers to obtain unspecified device access via unknown vectors.",
+    "cvss_score": 5.0,
+    "published": "2013-02-15T12:09:27.850"
+  },
+  {
+    "id": "CVE-2016-2310",
+    "cwe": "CWE-798",
+    "description": "General Electric (GE) Multilink ML800, ML1200, ML1600, and ML2400 switches with firmware before 5.5.0 and ML810, ML3000, and ML3100 switches with firmware before 5.5.0k have hardcoded credentials, which allows remote attackers to modify configuration settings via the web interface.",
+    "cvss_score": 9.8,
+    "published": "2016-06-09T10:59:00.290"
+  },
+  {
+    "id": "CVE-2016-5081",
+    "cwe": "CWE-798",
+    "description": "ZModo ZP-NE14-S and ZP-IBH-13W devices have a hardcoded root password, which makes it easier for remote attackers to obtain access via a TELNET session.",
+    "cvss_score": 9.8,
+    "published": "2016-08-24T02:00:07.540"
+  },
+  {
+    "id": "CVE-2016-5333",
+    "cwe": "CWE-798",
+    "description": "VMware Photos OS OVA 1.0 before 2016-08-14 has a default SSH public key in an authorized_keys file, which allows remote attackers to obtain SSH access by leveraging knowledge of the private key.",
+    "cvss_score": 9.8,
+    "published": "2016-08-31T01:59:17.310"
+  },
+  {
+    "id": "CVE-2016-5678",
+    "cwe": "CWE-798",
+    "description": "NUUO NVRmini 2 1.0.0 through 3.0.0 and NUUO NVRsolo 1.0.0 through 3.0.0 have hardcoded root credentials, which allows remote attackers to obtain administrative access via unspecified vectors.",
+    "cvss_score": 9.8,
+    "published": "2016-08-31T15:59:04.747"
+  },
+  {
+    "id": "CVE-2016-6535",
+    "cwe": "CWE-798",
+    "description": "AVer Information EH6108H+ devices with firmware X9.03.24.00.07l have hardcoded accounts, which allows remote attackers to obtain root access by leveraging knowledge of the credentials and establishing a TELNET session.",
+    "cvss_score": 9.8,
+    "published": "2016-09-19T01:59:07.400"
+  },
+  {
+    "id": "CVE-2002-2426",
+    "cwe": "CWE-352",
+    "description": "Cross-site request forgery (CSRF) vulnerability in Citrix Presentation Server 4.0 and 4.5, MetaFrame Presentation Server 3.0, and Access Essentials 1.0 through 2.0 allows remote attackers to execute arbitrary published applications, and possibly other programs, as authenticated users via the InitialProgram key in an ICA connection. NOTE: some of these details are obtained from third party information.",
+    "cvss_score": 4.3,
+    "published": "2002-12-31T05:00:00.000"
+  },
+  {
+    "id": "CVE-2004-1967",
+    "cwe": "CWE-352",
+    "description": "Cross-site request forgery (CSRF) vulnerabilities in (1) cp_forums.php, (2) cp_usergroup.php, (3) cp_ipbans.php, (4) myhome.php, (5) post.php, or (6) moderator.php in Open Bulletin Board (OpenBB) 1.0.6 and earlier allow remote attackers to execute arbitrary code by including the code in an image tag or a link.",
+    "cvss_score": 8.8,
+    "published": "2004-04-25T04:00:00.000"
+  },
+  {
+    "id": "CVE-2004-1703",
+    "cwe": "CWE-352",
+    "description": "Fusion News 3.6.1 allows remote attackers to add user accounts, if the administrator is logged in, via a comment that contains an img bbcode tag that calls index.php with the signup action, which is executed when the administrator's browser loads the page with the img tag.",
+    "cvss_score": 8.8,
+    "published": "2004-07-30T04:00:00.000"
+  },
+  {
+    "id": "CVE-2004-1842",
+    "cwe": "CWE-352",
+    "description": "Cross-site request forgery (CSRF) vulnerability in Php-Nuke 6.x through 7.1.0 allows remote attackers to gain administrative privileges via an img tag with a URL to admin.php.",
+    "cvss_score": 8.8,
+    "published": "2004-12-31T05:00:00.000"
+  },
+  {
+    "id": "CVE-2004-1995",
+    "cwe": "CWE-352",
+    "description": "Cross-Site Request Forgery (CSRF) vulnerability in FuseTalk 2.0 allows remote attackers to create arbitrary accounts via a link to adduser.cfm.",
+    "cvss_score": 6.5,
+    "published": "2004-12-31T05:00:00.000"
+  },
+  {
+    "id": "CVE-2005-1674",
+    "cwe": "CWE-352",
+    "description": "Cross-Site Request Forgery (CSRF) vulnerability in Help Center Live allows remote attackers to perform actions as the administrator via a link or IMG tag to view.php.",
+    "cvss_score": 6.5,
+    "published": "2005-05-19T04:00:00.000"
+  },
+  {
+    "id": "CVE-2005-1947",
+    "cwe": "CWE-352",
+    "description": "Cross-site request forgery (CSRF) vulnerability in Invision Gallery before 1.3.1 allows remote attackers to delete albums and images as another user via a link or IMG tag to the (1) albums or (2) delimg actions.",
+    "cvss_score": 4.3,
+    "published": "2005-06-09T04:00:00.000"
+  },
+  {
+    "id": "CVE-2005-2059",
+    "cwe": "CWE-352",
+    "description": "Multiple cross-site request forgery (CSRF) vulnerabilities in (1) addaddress.php, (2) toggleignore.php, (3) removeignore.php, and (4) removeaddress.php in Infopop UBB.Threads before 6.5.2 Beta allow remote attackers to modify settings as another user via a link or IMG tag.",
+    "cvss_score": 6.5,
+    "published": "2005-06-29T04:00:00.000"
+  },
+  {
+    "id": "CVE-2005-3348",
+    "cwe": "CWE-352",
+    "description": "HTTP response splitting vulnerability in index.php in phpSysInfo 2.4 and earlier, as used in phpgroupware 0.9.16 and earlier, and egroupware before 1.0.0.009, allows remote attackers to spoof web content and poison web caches via CRLF sequences in the charset parameter.",
+    "cvss_score": 4.3,
+    "published": "2005-11-18T02:02:00.000"
+  },
+  {
+    "id": "CVE-2006-5175",
+    "cwe": "CWE-352",
+    "description": "Cross-site request forgery (CSRF) vulnerability in the administrative interface for the TeraStation HD-HTGL firmware 2.05 beta 1 and earlier allows remote attackers to modify configurations or delete arbitrary data via unspecified vectors.",
+    "cvss_score": 7.6,
+    "published": "2006-10-10T04:06:00.000"
+  },
+  {
+    "id": "CVE-2006-6701",
+    "cwe": "CWE-352",
+    "description": "Cross-site request forgery (CSRF) vulnerability in util.pl in @Mail WebMail 4.51, and util.php in 5.x before 5.03, allows remote attackers to modify arbitrary settings and perform unauthorized actions as an arbitrary user, as demonstrated using a settings action in the SRC attribute of an IMG element in an HTML e-mail.",
+    "cvss_score": 7.5,
+    "published": "2006-12-23T01:28:00.000"
+  },
+  {
+    "id": "CVE-2006-6741",
+    "cwe": "CWE-352",
+    "description": "Cross-site request forgery (CSRF) vulnerability in urlobox in MKPortal allows remote attackers to delete arbitrary messages as an administrator via a delete operation in an img BBcode tag.",
+    "cvss_score": 5.8,
+    "published": "2006-12-26T23:28:00.000"
+  },
+  {
+    "id": "CVE-2007-0044",
+    "cwe": "CWE-352",
+    "description": "Adobe Acrobat Reader Plugin before 8.0.0 for the Firefox, Internet Explorer, and Opera web browsers allows remote attackers to force the browser to make unauthorized requests to other web sites via a URL in the (1) FDF, (2) xml, and (3) xfdf AJAX request parameters, following the # (hash) character, aka \"Universal CSRF and session riding.\"",
+    "cvss_score": 4.3,
+    "published": "2007-01-03T21:28:00.000"
+  },
+  {
+    "id": "CVE-2007-1157",
+    "cwe": "CWE-352",
+    "description": "Cross-site request forgery (CSRF) vulnerability in jmx-console/HtmlAdaptor in JBoss allows remote attackers to perform privileged actions as administrators via certain MBean operations, a different vulnerability than CVE-2006-3733.",
+    "cvss_score": 7.6,
+    "published": "2007-03-02T21:18:00.000"
+  },
+  {
+    "id": "CVE-2007-1276",
+    "cwe": "CWE-352",
+    "description": "Multiple cross-site scripting (XSS) vulnerabilities in chooser.cgi in Webmin before 1.330 and Usermin before 1.260 allow remote attackers to inject arbitrary web script or HTML via a crafted filename.",
+    "cvss_score": 4.3,
+    "published": "2007-03-05T20:19:00.000"
+  },
+  {
+    "id": "CVE-2007-1489",
+    "cwe": "CWE-352",
+    "description": "Unspecified vulnerability in web-app.org Web Automated Perl Portal (WebAPP) 0.9.9.4 to 0.9.9.6 allows remote attackers to obtain admin access by modifying cookies and performing \"certain consecutive actions,\" possibly due to a cross-site request forgery (CSRF) vulnerability.",
+    "cvss_score": 6.8,
+    "published": "2007-03-16T21:19:00.000"
+  },
+  {
+    "id": "CVE-2007-1520",
+    "cwe": "CWE-352",
+    "description": "The cross-site request forgery (CSRF) protection in PHP-Nuke 8.0 and earlier does not ensure the SERVER superglobal is an array before validating the HTTP_REFERER, which allows remote attackers to conduct CSRF attacks.",
+    "cvss_score": 6.8,
+    "published": "2007-03-20T20:19:00.000"
+  },
+  {
+    "id": "CVE-2007-2589",
+    "cwe": "CWE-352",
+    "description": "Cross-site request forgery (CSRF) vulnerability in compose.php in SquirrelMail 1.4.0 through 1.4.9a allows remote attackers to send e-mails from arbitrary users via certain data in the SRC attribute of an IMG element.",
+    "cvss_score": 5.0,
+    "published": "2007-05-11T04:20:00.000"
+  },
+  {
+    "id": "CVE-2007-3416",
+    "cwe": "CWE-352",
+    "description": "Multiple cross-site request forgery (CSRF) vulnerabilities in the administration of (1) polls, (2) profiles, (3) IP bans, and (4) forums in (a) web-app.org WebAPP 0.8 through 0.9.9.6; and (b) web-app.net WebAPP 0.9.9.3.3, 0.9.9.3.4, and 2007; allow remote attackers to perform deletions as administrators.",
+    "cvss_score": 5.0,
+    "published": "2007-06-26T23:30:00.000"
+  },
+  {
+    "id": "CVE-2007-3457",
+    "cwe": "CWE-352",
+    "description": "Adobe Flash Player 8.0.34.0 and earlier insufficiently validates HTTP Referer headers, which might allow remote attackers to conduct a CSRF attack via a crafted SWF file.",
+    "cvss_score": 4.3,
+    "published": "2007-07-11T16:30:00.000"
+  },
+  {
+    "id": "CVE-1999-0861",
+    "cwe": "CWE-362",
+    "description": "Race condition in the SSL ISAPI filter in IIS and other servers may leak information in plaintext.",
+    "cvss_score": 2.6,
+    "published": "1999-08-11T04:00:00.000"
+  },
+  {
+    "id": "CVE-2000-0864",
+    "cwe": "CWE-362",
+    "description": "Race condition in the creation of a Unix domain socket in GNOME esound 0.2.19 and earlier allows a local user to change the permissions of arbitrary files and directories, and gain additional privileges, via a  symlink attack.",
+    "cvss_score": 6.2,
+    "published": "2000-11-14T05:00:00.000"
+  },
+  {
+    "id": "CVE-2002-2244",
+    "cwe": "CWE-362",
+    "description": "Akfingerd 0.5 and earlier versions allow local users to cause a denial of service (crash) via a .plan with a symlink to /dev/urandom or other device, then disconnecting while data is being transferred, which causes a SIGPIPE error that Akfingerd cannot handle.",
+    "cvss_score": 2.1,
+    "published": "2002-12-31T05:00:00.000"
+  },
+  {
+    "id": "CVE-2002-2374",
+    "cwe": "CWE-362",
+    "description": "Unspecified vulnerability in pprosetup in Sun PatchPro 2.0 has unknown impact and attack vectors related to \"unsafe use of temporary files.\"",
+    "cvss_score": 10.0,
+    "published": "2002-12-31T05:00:00.000"
+  },
+  {
+    "id": "CVE-2003-1438",
+    "cwe": "CWE-362",
+    "description": "Race condition in BEA WebLogic Server and Express 5.1 through 7.0.0.1, when using in-memory session replication or replicated stateful session beans, causes the same buffer to be provided to two users, which could allow one user to see session data that was intended for another user.",
+    "cvss_score": 4.3,
+    "published": "2003-12-31T05:00:00.000"
+  },
+  {
+    "id": "CVE-2003-1562",
+    "cwe": "CWE-362",
+    "description": "sshd in OpenSSH 3.6.1p2 and earlier, when PermitRootLogin is disabled and using PAM keyboard-interactive authentication, does not insert a delay after a root login attempt with the correct password, which makes it easier for remote attackers to use timing differences to determine if the password step of a multi-step authentication is successful, a different vulnerability than CVE-2003-0190.",
+    "cvss_score": 7.6,
+    "published": "2003-12-31T05:00:00.000"
+  },
+  {
+    "id": "CVE-2004-2491",
+    "cwe": "CWE-362",
+    "description": "A race condition in Opera web browser 7.53 Build 3850 causes Opera to fill in the address bar before the page has been loaded, which allows remote attackers to spoof the URL in the address bar via the window.open and location.replace HTML parameters, which facilitates phishing attacks.",
+    "cvss_score": 2.6,
+    "published": "2004-12-31T05:00:00.000"
+  },
+  {
+    "id": "CVE-2004-2659",
+    "cwe": "CWE-362",
+    "description": "Opera offers an Open button to verify that a user wishes to execute a downloaded file, which allows user-assisted remote attackers to construct a race condition that tricks a user into clicking Open via a request for a different mouse or keyboard action very shortly before the Open dialog appears.  NOTE: this is a different issue than CVE-2005-2407.",
+    "cvss_score": 4.0,
+    "published": "2004-12-31T05:00:00.000"
+  },
+  {
+    "id": "CVE-2004-2697",
+    "cwe": "CWE-362",
+    "description": "The Inventory Scout daemon (invscoutd) 1.3.0.0 and 2.0.2 for AIX 4.3.3 and 5.1 allows local users to gain privileges via a symlink attack on a command line argument (log file).  NOTE: this might be related to CVE-2006-5002.",
+    "cvss_score": 6.9,
+    "published": "2004-12-31T05:00:00.000"
+  },
+  {
+    "id": "CVE-2004-2698",
+    "cwe": "CWE-362",
+    "description": "Race condition in IMWheel 1.0.0pre11 and earlier, when running with the -k option, allows local users to cause a denial of service (IMWheel crash) and possibly modify arbitrary files via a symlink attack on the imwheel.pid file.",
+    "cvss_score": 6.9,
+    "published": "2004-12-31T05:00:00.000"
+  },
+  {
+    "id": "CVE-2005-3240",
+    "cwe": "CWE-362",
+    "description": "Race condition in Microsoft Internet Explorer allows user-assisted attackers to overwrite arbitrary files and possibly execute code by tricking a user into performing a drag-and-drop action from certain objects, such as file objects within a folder view, then predicting the drag action, and re-focusing to a malicious window.",
+    "cvss_score": 5.1,
+    "published": "2005-12-31T05:00:00.000"
+  },
+  {
+    "id": "CVE-2006-1057",
+    "cwe": "CWE-362",
+    "description": "Race condition in daemon/slave.c in gdm before 2.14.1 allows local users to gain privileges via a symlink attack when gdm performs chown and chgrp operations on the .ICEauthority file.",
+    "cvss_score": 3.7,
+    "published": "2006-04-25T01:02:00.000"
+  },
+  {
+    "id": "CVE-2006-2094",
+    "cwe": "CWE-362",
+    "description": "Microsoft Internet Explorer before Windows XP Service Pack 2 and Windows Server 2003 Service Pack 1, when Prompt is configured in Security Settings, uses modal dialogs to verify that a user wishes to run an ActiveX control or perform other risky actions, which allows user-assisted remote attackers to construct a race condition that tricks a user into clicking an object or pressing keys that are actually applied to a \"Yes\" approval for executing the control.",
+    "cvss_score": 5.1,
+    "published": "2006-04-29T10:02:00.000"
+  },
+  {
+    "id": "CVE-2006-0039",
+    "cwe": "CWE-362",
+    "description": "Race condition in the do_add_counters function in netfilter for Linux kernel 2.6.16 allows local users with CAP_NET_ADMIN capabilities to read kernel memory by triggering the race condition in a way that produces a size value that is inconsistent with allocated memory, which leads to a buffer over-read in IPT_ENTRY_ITERATE.",
+    "cvss_score": 4.7,
+    "published": "2006-05-19T22:02:00.000"
+  },
+  {
+    "id": "CVE-2006-4801",
+    "cwe": "CWE-362",
+    "description": "Race condition in Deja Vu, as used in Roxio Toast Titanium 7 and possibly other products, allows local users to execute arbitrary code via temporary files, including dejavu_manual.rb, which are executed with raised privileges.",
+    "cvss_score": 6.2,
+    "published": "2006-09-14T22:07:00.000"
+  },
+  {
+    "id": "CVE-2006-5178",
+    "cwe": "CWE-362",
+    "description": "Race condition in the symlink function in PHP 5.1.6 and earlier allows local users to bypass the open_basedir restriction by using a combination of symlink, mkdir, and unlink functions to change the file path after the open_basedir check and before the file is opened by the underlying system, as demonstrated by symlinking a symlink into a subdirectory, to point to a parent directory via .. (dot dot) sequences, and then unlinking the resulting symlink.",
+    "cvss_score": 6.2,
+    "published": "2006-10-10T04:06:00.000"
+  },
+  {
+    "id": "CVE-2006-6275",
+    "cwe": "CWE-362",
+    "description": "Race condition in the kernel in Sun Solaris 8 through 10 allows local users to cause a denial of service (panic) via unspecified vectors, possibly related to the exitlwps function and SIGKILL and /proc PCAGENT signals.",
+    "cvss_score": 4.7,
+    "published": "2006-12-04T11:28:00.000"
+  },
+  {
+    "id": "CVE-2007-0099",
+    "cwe": "CWE-362",
+    "description": "Race condition in the msxml3 module in Microsoft XML Core Services 3.0, as used in Internet Explorer 6 and other applications, allows remote attackers to execute arbitrary code or cause a denial of service (application crash) via many nested tags in an XML document in an IFRAME, when synchronous document rendering is frequently disrupted with asynchronous events, as demonstrated using a JavaScript timer, which can trigger NULL pointer dereferences or memory corruption, aka \"MSXML Memory Corrupti",
+    "cvss_score": 9.3,
+    "published": "2007-01-08T20:28:00.000"
+  },
+  {
+    "id": "CVE-2007-1249",
+    "cwe": "CWE-362",
+    "description": "MoveSortedContentAction in C1 Financial Services Contelligent 9.1.4 does not check \"the additional environment security configuration,\" which allows remote attackers with write permissions to reorder components.",
+    "cvss_score": 6.8,
+    "published": "2007-03-03T20:19:00.000"
+  },
+  {
+    "id": "CVE-2007-1741",
+    "cwe": "CWE-362",
+    "description": "Multiple race conditions in suexec in Apache HTTP Server (httpd) 2.2.3 between directory and file validation, and their usage, allow local users to gain privileges and execute arbitrary code by renaming directories or performing symlink attacks. NOTE: the researcher, who is reliable, claims that the vendor disputes the issue because \"the attacks described rely on an insecure server configuration\" in which the user \"has write access to the document root.\"",
+    "cvss_score": 6.2,
+    "published": "2007-04-13T16:19:00.000"
+  },
+  {
+    "id": "CVE-1999-0067",
+    "cwe": "CWE-78",
+    "description": "phf CGI program allows remote command execution through shell metacharacters.",
+    "cvss_score": 10.0,
+    "published": "1996-03-20T05:00:00.000"
+  },
+  {
+    "id": "CVE-2001-1583",
+    "cwe": "CWE-78",
+    "description": "lpd daemon (in.lpd) in Solaris 8 and earlier allows remote attackers to execute arbitrary commands via a job request with a crafted control file that is not properly handled when lpd invokes a mail program. NOTE: this might be the same vulnerability as CVE-2000-1220.",
+    "cvss_score": 10.0,
+    "published": "2001-12-31T05:00:00.000"
+  },
+  {
+    "id": "CVE-2002-0061",
+    "cwe": "CWE-78",
+    "description": "Apache for Win32 before 1.3.24, and 2.0.x before 2.0.34-beta, allows remote attackers to execute arbitrary commands via shell metacharacters (a | pipe character) provided as arguments to batch (.bat) or .cmd scripts, which are sent unfiltered to the shell interpreter, typically cmd.exe.",
+    "cvss_score": 7.5,
+    "published": "2002-03-21T05:00:00.000"
+  },
+  {
+    "id": "CVE-2002-1660",
+    "cwe": "CWE-78",
+    "description": "calendar.php in vBulletin before 2.2.0 allows remote attackers to execute arbitrary commands via shell metacharacters in the command parameter.",
+    "cvss_score": 7.5,
+    "published": "2002-12-31T05:00:00.000"
+  },
+  {
+    "id": "CVE-2002-1898",
+    "cwe": "CWE-78",
+    "description": "Terminal 1.3 in Apple Mac OS X 10.2 allows remote attackers to execute arbitrary commands via shell metacharacters in a telnet:// link, which is executed by Terminal.app window.",
+    "cvss_score": 7.2,
+    "published": "2002-12-31T05:00:00.000"
+  },
+  {
+    "id": "CVE-2003-0041",
+    "cwe": "CWE-78",
+    "description": "Kerberos FTP client allows remote FTP sites to execute arbitrary code via a pipe (|) character in a filename that is retrieved by the client.",
+    "cvss_score": 10.0,
+    "published": "2003-02-19T05:00:00.000"
+  },
+  {
+    "id": "CVE-2004-2732",
+    "cwe": "CWE-78",
+    "description": "nbmember.cgi in Netbilling 2.0 allows remote attackers to obtain sensitive information via the cmd=test option, which can be leveraged to determine the access key.",
+    "cvss_score": 4.3,
+    "published": "2004-12-31T05:00:00.000"
+  },
+  {
+    "id": "CVE-2005-2368",
+    "cwe": "CWE-78",
+    "description": "vim 6.3 before 6.3.082, with modelines enabled, allows external user-assisted attackers to execute arbitrary commands via shell metacharacters in the (1) glob or (2) expand commands of a foldexpr expression for calculating fold levels.",
+    "cvss_score": 9.3,
+    "published": "2005-07-26T04:00:00.000"
+  },
+  {
+    "id": "CVE-2006-0325",
+    "cwe": "CWE-78",
+    "description": "Etomite Content Management System 0.6, and possibly earlier versions, when downloaded from the web site in January 2006 after January 10, contains a back door in manager/includes/todo.inc.php, which allows remote attackers to execute arbitrary commands via the \"cij\" parameter.",
+    "cvss_score": 7.5,
+    "published": "2006-01-20T21:03:00.000"
+  },
+  {
+    "id": "CVE-2006-6427",
+    "cwe": "CWE-78",
+    "description": "The Web User Interface in Xerox WorkCentre and WorkCentre Pro before 12.060.17.000, 13.x before 13.060.17.000, and 14.x before 14.060.17.000 allows remote attackers to execute arbitrary commands via unspecified vectors involving \"command injection\" in (1) the TCP/IP hostname, (2) Scan-to-mailbox folder names, and (3) certain parameters in the Microsoft Networking configuration.  NOTE: vector 1 might be the same as CVE-2006-5290.",
+    "cvss_score": 7.5,
+    "published": "2006-12-10T11:28:00.000"
+  },
+  {
+    "id": "CVE-2007-4041",
+    "cwe": "CWE-78",
+    "description": "Multiple argument injection vulnerabilities in Mozilla Firefox 2.0.0.5 and 3.0alpha allow remote attackers to execute arbitrary commands via a NULL byte (%00) and shell metacharacters in a (1) mailto, (2) nntp, (3) news, (4) snews, or (5) telnet URI, a similar issue to CVE-2007-3670.",
+    "cvss_score": 6.8,
+    "published": "2007-07-27T22:30:00.000"
+  },
+  {
+    "id": "CVE-2007-4560",
+    "cwe": "CWE-78",
+    "description": "clamav-milter in ClamAV before 0.91.2, when run in black hole mode, allows remote attackers to execute arbitrary commands via shell metacharacters that are used in a certain popen call, involving the \"recipient field of sendmail.\"",
+    "cvss_score": 7.6,
+    "published": "2007-08-28T01:17:00.000"
+  },
+  {
+    "id": "CVE-2007-4891",
+    "cwe": "CWE-78",
+    "description": "A certain ActiveX control in PDWizard.ocx 6.0.0.9782 and earlier in Microsoft Visual Studio 6.0 exposes dangerous (1) StartProcess, (2) SyncShell, (3) SaveAs, (4) CABDefaultURL, (5) CABFileName, and (6) CABRunFile methods, which allows remote attackers to execute arbitrary programs and have other impacts, as demonstrated using absolute pathnames in arguments to StartProcess and SyncShell.",
+    "cvss_score": 6.8,
+    "published": "2007-09-14T01:17:00.000"
+  },
+  {
+    "id": "CVE-2007-4673",
+    "cwe": "CWE-78",
+    "description": "Argument injection vulnerability in Apple QuickTime 7.2 for Windows XP SP2 and Vista allows remote attackers to execute arbitrary commands via a URL in the qtnext field in a crafted QTL file.  NOTE: this issue may be related to CVE-2006-4965 or CVE-2007-5045.",
+    "cvss_score": 9.3,
+    "published": "2007-10-04T23:17:00.000"
+  },
+  {
+    "id": "CVE-2007-5322",
+    "cwe": "CWE-78",
+    "description": "Insecure method vulnerability in the FPOLE.OCX 6.0.8450.0 ActiveX control in Microsoft Visual FoxPro 6.0 allows remote attackers to execute arbitrary programs by specifying them as an argument to the FoxDoCmd function.",
+    "cvss_score": 7.5,
+    "published": "2007-10-09T22:17:00.000"
+  },
+  {
+    "id": "CVE-2007-5653",
+    "cwe": "CWE-78",
+    "description": "The Component Object Model (COM) functions in PHP 5.x on Windows do not follow safe_mode and disable_functions restrictions, which allows context-dependent attackers to bypass intended limitations, as demonstrated by executing objects with the kill bit set in the corresponding ActiveX control Compatibility Flags, executing programs via a function in compatUI.dll, invoking wscript.shell via wscript.exe, invoking Scripting.FileSystemObject via wshom.ocx, and adding users via a function in shgina.d",
+    "cvss_score": 9.3,
+    "published": "2007-10-23T21:47:00.000"
+  },
+  {
+    "id": "CVE-2008-1115",
+    "cwe": "CWE-78",
+    "description": "Unspecified vulnerability in Sun Solaris 8 directory functions allows local users to cause a denial of service (panic) via an unspecified sequence of system calls or commands.",
+    "cvss_score": 4.9,
+    "published": "2008-03-03T18:44:00.000"
+  },
+  {
+    "id": "CVE-2008-2575",
+    "cwe": "CWE-78",
+    "description": "cbrPager before 0.9.17 allows user-assisted remote attackers to execute arbitrary commands via shell metacharacters in a (1) ZIP (aka .cbz) or (2) RAR (aka .cbr) archive filename.",
+    "cvss_score": 6.8,
+    "published": "2008-06-06T22:32:00.000"
+  },
+  {
+    "id": "CVE-2008-4796",
+    "cwe": "CWE-78",
+    "description": "The _httpsrequest function (Snoopy/Snoopy.class.php) in Snoopy 1.2.3 and earlier, as used in (1) ampache, (2) libphp-snoopy, (3) mahara, (4) mediamate, (5) opendb, (6) pixelpost, and possibly other products, allows remote attackers to execute arbitrary commands via shell metacharacters in https URLs.",
+    "cvss_score": 10.0,
+    "published": "2008-10-30T20:56:54.770"
+  },
+  {
+    "id": "CVE-2008-4636",
+    "cwe": "CWE-78",
+    "description": "yast2-backup 2.14.2 through 2.16.6 on SUSE Linux and Novell Linux allows local users to gain privileges via shell metacharacters in filenames used by the backup process.",
+    "cvss_score": 7.2,
+    "published": "2008-11-27T00:30:00.280"
+  },
+  {
+    "id": "CVE-2001-0340",
+    "cwe": "CWE-434",
+    "description": "An interaction between the Outlook Web Access (OWA) service in Microsoft Exchange 2000 Server and Internet Explorer allows attackers to execute malicious script code against a user's mailbox via a message attachment that contains HTML code, which is executed automatically.",
+    "cvss_score": 7.5,
+    "published": "2001-07-21T04:00:00.000"
+  },
+  {
+    "id": "CVE-2001-1099",
+    "cwe": "CWE-434",
+    "description": "The default configuration of Norton AntiVirus for Microsoft Exchange 2000 2.x allows remote attackers to identify the recipient's INBOX file path by sending an email with an attachment containing malicious content, which includes the path in the rejection notice.",
+    "cvss_score": 5.0,
+    "published": "2001-09-07T04:00:00.000"
+  },
+  {
+    "id": "CVE-2001-0901",
+    "cwe": "CWE-434",
+    "description": "Hypermail allows remote attackers to execute arbitrary commands on a server supporting SSI via an attachment with a .shtml extension, which is archived on the server and can then be executed by requesting the URL for the attachment.",
+    "cvss_score": 7.5,
+    "published": "2001-11-19T05:00:00.000"
+  },
+  {
+    "id": "CVE-2002-1841",
+    "cwe": "CWE-434",
+    "description": "The document management module in NOLA 1.1.1 and 1.1.2 does not restrict the types of files that are uploaded, which allows remote attackers to upload and execute arbitrary PHP files with extensions such as .php4.",
+    "cvss_score": 5.0,
+    "published": "2002-12-31T05:00:00.000"
+  },
+  {
+    "id": "CVE-2004-2262",
+    "cwe": "CWE-434",
+    "description": "ImageManager in e107 before 0.617 does not properly check the types of uploaded files, which allows remote attackers to execute arbitrary code by uploading a PHP file via the upload parameter to images.php.",
+    "cvss_score": 7.5,
+    "published": "2004-12-31T05:00:00.000"
+  },
+  {
+    "id": "CVE-2005-0254",
+    "cwe": "CWE-434",
+    "description": "BibORB 1.3.2, and possibly earlier versions, does not properly enforce a restriction for uploading only PDF and PS files, which allows remote attackers to upload arbitrary files that are presented to other users with PDF or PS icons, which may trick some users into downloading and executing those files.",
+    "cvss_score": 3.7,
+    "published": "2005-05-02T04:00:00.000"
+  },
+  {
+    "id": "CVE-2005-1881",
+    "cwe": "CWE-434",
+    "description": "upload.php in YaPiG 0.92b, 0.93u and 0.94u does not properly restrict the file extension for uploaded image files, which allows remote attackers to upload arbitrary files and execute arbitrary PHP code.",
+    "cvss_score": 7.5,
+    "published": "2005-06-06T04:00:00.000"
+  },
+  {
+    "id": "CVE-2005-1868",
+    "cwe": "CWE-434",
+    "description": "I-Man 0.9, and possibly earlier versions, allows remote attackers to execute arbitrary PHP code by uploading a file attachment with a .php extension.",
+    "cvss_score": 7.5,
+    "published": "2005-06-09T04:00:00.000"
+  },
+  {
+    "id": "CVE-2005-3288",
+    "cwe": "CWE-434",
+    "description": "Mailsite Express allows remote attackers to upload and execute files with executable extensions such as ASP by attaching the file using the \"compose page\" feature, then accessing the file from the cache directory before saving or sending the message.",
+    "cvss_score": 5.0,
+    "published": "2005-10-23T10:02:00.000"
+  },
+  {
+    "id": "CVE-2006-2428",
+    "cwe": "CWE-434",
+    "description": "add.asp in DUware DUbanner 3.1 allows remote attackers to execute arbitrary code by uploading files with arbitrary extensions, such as ASP files, probably due to client-side enforcement that can be bypassed.  NOTE: some of these details are obtained from third party information, since the raw source is vague.",
+    "cvss_score": 7.5,
+    "published": "2006-05-17T10:06:00.000"
+  },
+  {
+    "id": "CVE-2006-4471",
+    "cwe": "CWE-434",
+    "description": "The Admin Upload Image functionality in Joomla! before 1.0.11 allows remote authenticated users to upload files outside of the /images/stories/ directory via unspecified vectors.",
+    "cvss_score": 6.5,
+    "published": "2006-08-31T20:04:00.000"
+  },
+  {
+    "id": "CVE-2006-4558",
+    "cwe": "CWE-434",
+    "description": "DeluxeBB 1.06 and earlier, when run on the Apache HTTP Server with the mod_mime module, allows remote attackers to execute arbitrary PHP code by uploading files with double extensions via the fileupload parameter in a newthread action in newpost.php.",
+    "cvss_score": 7.5,
+    "published": "2006-09-06T00:04:00.000"
+  },
+  {
+    "id": "CVE-2006-5845",
+    "cwe": "CWE-434",
+    "description": "Unrestricted file upload vulnerability in index.php in Speedywiki 2.0 allows remote authenticated users to upload and execute arbitrary PHP code by setting the upload parameter to 1.",
+    "cvss_score": 6.5,
+    "published": "2006-11-10T02:07:00.000"
+  },
+  {
+    "id": "CVE-2006-6994",
+    "cwe": "CWE-434",
+    "description": "Unrestricted file upload vulnerability in add.asp in OzzyWork Gallery, possibly 2.0 and earlier, allows remote attackers to upload and execute arbitrary ASP files by removing the client-side security checks.",
+    "cvss_score": 6.4,
+    "published": "2007-02-12T11:28:00.000"
+  },
+  {
+    "id": "CVE-2015-0702",
+    "cwe": "CWE-434",
+    "description": "Unrestricted file upload vulnerability in the Custom Prompts upload implementation in Cisco Unified MeetingPlace 8.6(1.9) allows remote authenticated users to execute arbitrary code by using the languageShortName parameter to upload a file that provides shell access, aka Bug ID CSCus95712.",
+    "cvss_score": 9.0,
+    "published": "2015-04-21T02:59:00.997"
+  },
+  {
+    "id": "CVE-2015-4524",
+    "cwe": "CWE-434",
+    "description": "Unrestricted file upload vulnerability in EMC Documentum WebTop 6.7SP1 before P31, 6.7SP2 before P23, and 6.8 before P01; Documentum Administrator 6.7SP1 before P31, 6.7SP2 before P23, 7.0 before P18, 7.1 before P15, and 7.2 before P01; Documentum Digital Assets Manager 6.5SP6 before P25; Documentum Web Publishers 6.5 SP7 before P25; and Documentum Task Space 6.7SP1 before P31 and 6.7SP2 before P23 allows remote authenticated users to execute arbitrary code by uploading a file to the backend Con",
+    "cvss_score": 6.5,
+    "published": "2015-07-04T14:59:01.917"
+  },
+  {
+    "id": "CVE-2016-3088",
+    "cwe": "CWE-434",
+    "description": "The Fileserver web application in Apache ActiveMQ 5.x before 5.14.0 allows remote attackers to upload and execute arbitrary files via an HTTP PUT followed by an HTTP MOVE request.",
+    "cvss_score": 9.8,
+    "published": "2016-06-01T20:59:04.123"
+  },
+  {
+    "id": "CVE-2016-2914",
+    "cwe": "CWE-434",
+    "description": "Unrestricted file upload vulnerability in the Document Builder in IBM Rational Publishing Engine (aka RPENG) 2.0.1 before ifix002 allows remote authenticated users to execute arbitrary code by specifying an unexpected file extension.",
+    "cvss_score": 5.4,
+    "published": "2016-08-08T01:59:09.320"
+  },
+  {
+    "id": "CVE-2016-5050",
+    "cwe": "CWE-434",
+    "description": "Unrestricted file upload vulnerability in chat/sendfile.aspx in ReadyDesk 9.1 allows remote attackers to execute arbitrary code by uploading and requesting a .aspx file.",
+    "cvss_score": 9.8,
+    "published": "2016-08-26T19:59:11.147"
+  },
+  {
+    "id": "CVE-2015-1000000",
+    "cwe": "CWE-434",
+    "description": "Remote file upload vulnerability in mailcwp v1.99 wordpress plugin",
+    "cvss_score": 9.8,
+    "published": "2016-10-06T14:59:00.223"
+  },
+  {
+    "id": "CVE-2002-0999",
+    "cwe": "CWE-89",
+    "description": "Multiple SQL injection vulnerabilities in CARE 2002 before beta 1.0.02 allow remote attackers to perform unauthorized database operations.",
+    "cvss_score": 7.5,
+    "published": "2002-10-04T04:00:00.000"
+  },
+  {
+    "id": "CVE-2002-2252",
+    "cwe": "CWE-89",
+    "description": "SQL injection vulnerability in auth.inc.php in Thatware 0.5.0 and earlier allows remote attackers to execute arbitrary SQL commands via a base64-encoded user parameter.",
+    "cvss_score": 7.5,
+    "published": "2002-12-31T05:00:00.000"
+  },
+  {
+    "id": "CVE-2002-2277",
+    "cwe": "CWE-89",
+    "description": "SQL injection vulnerability in mod_search/index.php in PortailPHP 0.99 allows remote attackers to execute arbitrary SQL commands via the (1) $rech, (2) $BD_Tab_docs, (3) $BD_Tab_file, (4) $BD_Tab_liens, (5) $BD_Tab_faq, or (6) $chemin variables.",
+    "cvss_score": 7.5,
+    "published": "2002-12-31T05:00:00.000"
+  },
+  {
+    "id": "CVE-2002-2304",
+    "cwe": "CWE-89",
+    "description": "SQL injection vulnerability in admin/auth/checksession.php in MyPHPLinks 2.1.9 and 2.2.0 allows remote attackers to execute arbitrary SQL commands via the idsession parameter.",
+    "cvss_score": 7.5,
+    "published": "2002-12-31T05:00:00.000"
+  },
+  {
+    "id": "CVE-2002-2305",
+    "cwe": "CWE-89",
+    "description": "SQL injection vulnerability in agentadmin.php in Immobilier allows remote attackers to execute arbitrary SQL commands via the (1) agentname or (2) agentpassword parameter.",
+    "cvss_score": 7.5,
+    "published": "2002-12-31T05:00:00.000"
+  },
+  {
+    "id": "CVE-2002-2383",
+    "cwe": "CWE-89",
+    "description": "SQL injection vulnerability in f2html.pl 0.1 through 0.4 allows remote attackers to execute arbitrary SQL commands via file names.",
+    "cvss_score": 7.5,
+    "published": "2002-12-31T05:00:00.000"
+  },
+  {
+    "id": "CVE-2002-2391",
+    "cwe": "CWE-89",
+    "description": "SQL injection vulnerability in index.php of WebChat 1.5 included in XOOPS 1.0 allows remote attackers to execute arbitrary SQL commands via the roomid parameter.",
+    "cvss_score": 7.5,
+    "published": "2002-12-31T05:00:00.000"
+  },
+  {
+    "id": "CVE-2003-0286",
+    "cwe": "CWE-89",
+    "description": "SQL injection vulnerability in register.asp in Snitz Forums 2000 before 3.4.03, and possibly 3.4.07 and earlier, allows remote attackers to execute arbitrary stored procedures via the Email variable.",
+    "cvss_score": 7.5,
+    "published": "2003-06-16T04:00:00.000"
+  },
+  {
+    "id": "CVE-2003-0377",
+    "cwe": "CWE-89",
+    "description": "SQL injection vulnerability in the web-based administration interface for iisPROTECT 2.2-r4, and possibly earlier versions, allows remote attackers to insert arbitrary SQL and execute code via certain variables, as demonstrated using the GroupName variable in SiteAdmin.ASP.",
+    "cvss_score": 7.5,
+    "published": "2003-06-16T04:00:00.000"
+  },
+  {
+    "id": "CVE-2003-0845",
+    "cwe": "CWE-89",
+    "description": "Unknown vulnerability in the HSQLDB component in JBoss 3.2.1 and 3.0.8 on Java 1.4.x platforms, when running in the default configuration, allows remote attackers to conduct unauthorized activities and possibly execute arbitrary code via certain SQL statements to (1) TCP port 1701 in JBoss 3.2.1, and (2) port 1476 in JBoss 3.0.8.",
+    "cvss_score": 7.5,
+    "published": "2003-11-17T05:00:00.000"
+  },
+  {
+    "id": "CVE-2003-1244",
+    "cwe": "CWE-89",
+    "description": "SQL injection vulnerability in page_header.php in phpBB 2.0, 2.0.1 and 2.0.2 allows remote attackers to brute force user passwords and possibly gain unauthorized access to forums via the forum_id parameter to index.php.",
+    "cvss_score": 7.5,
+    "published": "2003-12-31T05:00:00.000"
+  },
+  {
+    "id": "CVE-2003-1340",
+    "cwe": "CWE-89",
+    "description": "Multiple SQL injection vulnerabilities in Francisco Burzi PHP-Nuke 5.6 and 6.5 allow remote authenticated users to execute arbitrary SQL commands via (1) a uid (user) cookie to modules.php; and allow remote attackers to execute arbitrary SQL commands via an aid (admin) cookie to the Web_Links module in a (2) viewlink, (3) MostPopular, or (4) NewLinksDate action, different vectors than CVE-2003-0279.",
+    "cvss_score": 6.5,
+    "published": "2003-12-31T05:00:00.000"
+  },
+  {
+    "id": "CVE-2003-1435",
+    "cwe": "CWE-89",
+    "description": "SQL injection vulnerability in PHP-Nuke 5.6 and 6.0 allows remote attackers to execute arbitrary SQL commands via the days parameter to the search module.",
+    "cvss_score": 7.5,
+    "published": "2003-12-31T05:00:00.000"
+  },
+  {
+    "id": "CVE-2003-1458",
+    "cwe": "CWE-89",
+    "description": "SQL injection vulnerability in Profile.php in ttCMS 2.2 and ttForum allows remote attackers to execute arbitrary SQL commands via the member name.",
+    "cvss_score": 7.5,
+    "published": "2003-12-31T05:00:00.000"
+  },
+  {
+    "id": "CVE-2003-1504",
+    "cwe": "CWE-89",
+    "description": "SQL injection vulnerability in variables.php in Goldlink 3.0 allows remote attackers to execute arbitrary SQL commands via the (1) vadmin_login or (2) vadmin_pass cookie in a request to goldlink.php.",
+    "cvss_score": 7.5,
+    "published": "2003-12-31T05:00:00.000"
+  },
+  {
+    "id": "CVE-2003-1520",
+    "cwe": "CWE-89",
+    "description": "SQL injection vulnerability in FuzzyMonkey My Classifieds 2.11 allows remote attackers to execute arbitrary SQL commands via the email parameter.",
+    "cvss_score": 6.8,
+    "published": "2003-12-31T05:00:00.000"
+  },
+  {
+    "id": "CVE-2003-1523",
+    "cwe": "CWE-89",
+    "description": "SQL injection vulnerability in the IMAP daemon in dbmail 1.1 allows remote attackers to execute arbitrary SQL commands via the (1) login username, (2) mailbox name, and possibly other attack vectors.",
+    "cvss_score": 7.5,
+    "published": "2003-12-31T05:00:00.000"
+  },
+  {
+    "id": "CVE-2003-1530",
+    "cwe": "CWE-89",
+    "description": "SQL injection vulnerability in privmsg.php in phpBB 2.0.3 and earlier allows remote attackers to execute arbitrary SQL commands via the mark[] parameter.",
+    "cvss_score": 7.5,
+    "published": "2003-12-31T05:00:00.000"
+  },
+  {
+    "id": "CVE-2003-1532",
+    "cwe": "CWE-89",
+    "description": "SQL injection vulnerability in compte.php in PhpMyShop 1.00 allows remote attackers to execute arbitrary SQL commands via the (1) identifiant and (2) password parameters.",
+    "cvss_score": 7.5,
+    "published": "2003-12-31T05:00:00.000"
+  },
+  {
+    "id": "CVE-2003-1533",
+    "cwe": "CWE-89",
+    "description": "SQL injection vulnerability in accesscontrol.php in PhpPass 2 allows remote attackers to execute arbitrary SQL commands via the (1) uid and (2) pwd parameters.",
+    "cvss_score": 7.5,
+    "published": "2003-12-31T05:00:00.000"
+  },
+  {
+    "id": "CVE-2000-1205",
+    "cwe": "CWE-79",
+    "description": "Cross site scripting vulnerabilities in Apache 1.3.0 through 1.3.11 allow remote attackers to execute script as other web site visitors via (1) the printenv CGI (printenv.pl), which does not encode its output, (2) pages generated by the ap_send_error_response function such as a default 404, which does not add an explicit charset, or (3) various messages that are generated by certain Apache modules or core code.  NOTE: the printenv issue might still exist for web browsers that can render text/pla",
+    "cvss_score": 4.3,
+    "published": "2000-02-01T05:00:00.000"
+  },
+  {
+    "id": "CVE-2002-0270",
+    "cwe": "CWE-79",
+    "description": "Opera, when configured with the \"Determine action by MIME type\" option disabled, interprets an object as an HTML document even when its MIME Content-Type is text/plain, which could allow remote attackers to execute arbitrary script in documents that the user does not expect, possibly through web applications that use a text/plain type to prevent cross-site scripting attacks.",
+    "cvss_score": 4.3,
+    "published": "2002-05-29T04:00:00.000"
+  },
+  {
+    "id": "CVE-2002-1651",
+    "cwe": "CWE-79",
+    "description": "Cross-site scripting (XSS) vulnerability in Verity Search97 allows remote attackers to insert arbitrary web content and steal sensitive information from other clients, possibly due to certain error messages from template pages that use the (1) vformat or (2) vfilter functions.",
+    "cvss_score": 4.3,
+    "published": "2002-12-31T05:00:00.000"
+  },
+  {
+    "id": "CVE-2002-1700",
+    "cwe": "CWE-79",
+    "description": "Cross-site scripting vulnerability (XSS) in the missing template handler in Macromedia ColdFusion MX allows remote attackers to execute arbitrary script as other users by injecting script into the HTTP request for the name of a template, which is not filtered in the resulting 404 error message.",
+    "cvss_score": 4.3,
+    "published": "2002-12-31T05:00:00.000"
+  },
+  {
+    "id": "CVE-2002-1852",
+    "cwe": "CWE-79",
+    "description": "Cross-site scripting (XSS) vulnerability in Monkey 0.5.0 allows remote attackers to inject arbitrary web script or HTML via (1) the URL or (2) a parameter to test2.pl.",
+    "cvss_score": 4.3,
+    "published": "2002-12-31T05:00:00.000"
+  },
+  {
+    "id": "CVE-2002-1958",
+    "cwe": "CWE-79",
+    "description": "Cross-site scripting (XSS) vulnerability in kmMail 1.0, 1.0a, and 1.0b allows remote attackers to inject arbitrary web script or HTML via (1) javascript in onmouseover or other attributes in \"safe\" HTML tags such as the \"b\" tag, or (2) the Subject field.",
+    "cvss_score": 4.3,
+    "published": "2002-12-31T05:00:00.000"
+  },
+  {
+    "id": "CVE-2002-2230",
+    "cwe": "CWE-79",
+    "description": "Cross-site scripting (XSS) vulnerability in Ikonboard 3.1.1 allows remote attackers to inject arbitrary web script or HTML via a private message with a javascript: URL in the IMG tag, in which the URL ends in a \".gif\" or \".jpg\" string, a variant of CVE-2002-0328.",
+    "cvss_score": 4.3,
+    "published": "2002-12-31T05:00:00.000"
+  },
+  {
+    "id": "CVE-2002-2231",
+    "cwe": "CWE-79",
+    "description": "Cross-site scripting (XSS) vulnerability in Ikonboard 3.1.1 allows remote attackers to inject arbitrary web script or HTML via (1) a javascript: URL in a photo URL or (2) an X-Forwarded-For: header.",
+    "cvss_score": 4.3,
+    "published": "2002-12-31T05:00:00.000"
+  },
+  {
+    "id": "CVE-2002-2246",
+    "cwe": "CWE-79",
+    "description": "Cross-site scripting (XSS) vulnerability in VisNetic Website before 3.5.15 allows remote attackers to inject arbitrary web script or HTML via the HTTP referer header (HTTP_REFERER) to a non-existent page, which is injected into the resulting 404 error page.",
+    "cvss_score": 4.3,
+    "published": "2002-12-31T05:00:00.000"
+  },
+  {
+    "id": "CVE-2002-2255",
+    "cwe": "CWE-79",
+    "description": "Cross-site scripting (XSS) vulnerability in search.php in phpBB 2.0.3 and possibly earlier versions allows remote attackers to inject arbitrary web script or HTML via the search_username parameter in searchuser mode.",
+    "cvss_score": 4.3,
+    "published": "2002-12-31T05:00:00.000"
+  },
+  {
+    "id": "CVE-2002-2260",
+    "cwe": "CWE-79",
+    "description": "Cross-site scripting (XSS) vulnerability in the quips feature in Mozilla Bugzilla 2.10 through 2.17 allows remote attackers to inject arbitrary web script or HTML via the \"show all quips\" page.",
+    "cvss_score": 4.3,
+    "published": "2002-12-31T05:00:00.000"
+  },
+  {
+    "id": "CVE-2002-2273",
+    "cwe": "CWE-79",
+    "description": "Cross-site scripting (XSS) vulnerability in Webster HTTP Server allows remote attackers to inject arbitrary web script or HTML via the URL.",
+    "cvss_score": 4.3,
+    "published": "2002-12-31T05:00:00.000"
+  },
+  {
+    "id": "CVE-2002-2278",
+    "cwe": "CWE-79",
+    "description": "Cross-site scripting (XSS) vulnerability in mod_search/index.php in PortailPHP 0.99 allows remote attackers to inject arbitrary web script or HTML via the (1) $App_Theme, (2) $Rub_Search, (3) $Rub_News, (4) $Rub_File, (5) $Rub_Liens, or (6) $Rub_Faq variables.",
+    "cvss_score": 4.3,
+    "published": "2002-12-31T05:00:00.000"
+  },
+  {
+    "id": "CVE-2002-2296",
+    "cwe": "CWE-79",
+    "description": "Cross-site scripting (XSS) vulnerability in YaBB.pl in Yet Another Bulletin Board (YaBB) 1 Gold SP 1 allows remote attackers to inject arbitrary web script or HTML via the num parameter.",
+    "cvss_score": 4.3,
+    "published": "2002-12-31T05:00:00.000"
+  },
+  {
+    "id": "CVE-2002-2318",
+    "cwe": "CWE-79",
+    "description": "Cross-site scripting (XSS) vulnerability in Falcon web server 2.0.0.1009 through 2.0.0.1021 allows remote attackers to inject arbitrary web script or HTML via the URI, which is inserted into 301 error messages and executed by 404 error messages.",
+    "cvss_score": 4.3,
+    "published": "2002-12-31T05:00:00.000"
+  },
+  {
+    "id": "CVE-2002-2321",
+    "cwe": "CWE-79",
+    "description": "Cross-site scripting (XSS) vulnerability in (1) showcat.php and (2) addyoursite.php in phpLinkat 0.1.0 allows remote attackers to inject arbitrary web script or HTML via the catid parameter.",
+    "cvss_score": 4.3,
+    "published": "2002-12-31T05:00:00.000"
+  },
+  {
+    "id": "CVE-2002-2330",
+    "cwe": "CWE-79",
+    "description": "Cross-site scripting (XSS) vulnerability in stat.pl in StatsPlus 1.25 allows remote attackers to inject arbitrary web script or HTML via (1) HTTP_USER_AGENT or (2) HTTP_REFERER, which is written to stats.html and executed in client browsers.",
+    "cvss_score": 5.0,
+    "published": "2002-12-31T05:00:00.000"
+  },
+  {
+    "id": "CVE-2002-2339",
+    "cwe": "CWE-79",
+    "description": "Cross-site scripting (XSS) vulnerability in configure.asp in Script-Shed GuestBook 1.0 allows remote attackers to inject arbitrary web script or HTML via a javascript: URL in (1) image, (2) img, (3) image=right, (4) img=right, (5) image=left, and (6) img=left tags.",
+    "cvss_score": 4.3,
+    "published": "2002-12-31T05:00:00.000"
+  },
+  {
+    "id": "CVE-2002-2340",
+    "cwe": "CWE-79",
+    "description": "Cross-site scripting (XSS) vulnerability in read.php in Phorum 3.3.2a allows remote attackers to inject arbitrary web script or HTML via (1) the t parameter or (2) the body of an email response.",
+    "cvss_score": 4.3,
+    "published": "2002-12-31T05:00:00.000"
+  },
+  {
+    "id": "CVE-2002-2341",
+    "cwe": "CWE-79",
+    "description": "Cross-site scripting (XSS) vulnerability in content blocking in SonicWALL SOHO3 6.3.0.0 allows remote attackers to inject arbitrary web script or HTML via a blocked URL.",
+    "cvss_score": 4.3,
+    "published": "2002-12-31T05:00:00.000"
+  },
+  {
+    "id": "CVE-1999-0366",
+    "cwe": "CWE-287",
+    "description": "In some cases, Service Pack 4 for Windows NT 4.0 can allow access to network shares using a blank password, through a problem with a null NT hash value.",
+    "cvss_score": 7.5,
+    "published": "1999-02-08T05:00:00.000"
+  },
+  {
+    "id": "CVE-1999-0680",
+    "cwe": "CWE-287",
+    "description": "Windows NT Terminal Server performs extra work when a client opens a new connection but before it is authenticated, allowing for a denial of service.",
+    "cvss_score": 5.0,
+    "published": "1999-08-09T04:00:00.000"
+  },
+  {
+    "id": "CVE-1999-0987",
+    "cwe": "CWE-287",
+    "description": "Windows NT does not properly download a system policy if the domain user logs into the domain with a space at the end of the domain name.",
+    "cvss_score": 10.0,
+    "published": "1999-11-18T05:00:00.000"
+  },
+  {
+    "id": "CVE-2001-0537",
+    "cwe": "CWE-287",
+    "description": "HTTP server for Cisco IOS 11.3 to 12.2 allows attackers to bypass authentication and execute arbitrary commands, when local authorization is being used, by specifying a high access level in the URL.",
+    "cvss_score": 9.3,
+    "published": "2001-07-21T04:00:00.000"
+  },
+  {
+    "id": "CVE-2001-1585",
+    "cwe": "CWE-287",
+    "description": "SSH protocol 2 (aka SSH-2) public key authentication in the development snapshot of OpenSSH 2.3.1, available from 2001-01-18 through 2001-02-08, does not perform a challenge-response step to ensure that the client has the proper private key, which allows remote attackers to bypass authentication as other users by supplying a public key from that user's authorized_keys file.",
+    "cvss_score": 6.8,
+    "published": "2001-12-31T05:00:00.000"
+  },
+  {
+    "id": "CVE-2002-0563",
+    "cwe": "CWE-287",
+    "description": "The default configuration of Oracle 9i Application Server 1.0.2.x allows remote anonymous users to access sensitive services without authentication, including Dynamic Monitoring Services (1) dms0, (2) dms/DMSDump, (3) servlet/DMSDump, (4) servlet/Spy, (5) soap/servlet/Spy, and (6) dms/AggreSpy; and Oracle Java Process Manager (7) oprocmgr-status and (8) oprocmgr-service, which can be used to control Java processes.",
+    "cvss_score": 5.0,
+    "published": "2002-07-03T04:00:00.000"
+  },
+  {
+    "id": "CVE-2002-0507",
+    "cwe": "CWE-287",
+    "description": "An interaction between Microsoft Outlook Web Access (OWA) with RSA SecurID allows local users to bypass the SecurID authentication for a previous user via several submissions of an OWA Authentication request with the proper OWA password for the previous user, which is eventually accepted by OWA.",
+    "cvss_score": 2.1,
+    "published": "2002-08-12T04:00:00.000"
+  },
+  {
+    "id": "CVE-2002-2279",
+    "cwe": "CWE-287",
+    "description": "Unspecified vulnerability in the bind function in config.inc of aldap 0.09 allows remote attackers to authenticate with Manager permissions.",
+    "cvss_score": 10.0,
+    "published": "2002-12-31T05:00:00.000"
+  },
+  {
+    "id": "CVE-2002-2397",
+    "cwe": "CWE-287",
+    "description": "Sygate personal firewall 5.0 could allow remote attackers to bypass firewall filters via spoofed (1) source IP address of 127.0.0.1 or (2) network address of 127.0.0.0.",
+    "cvss_score": 10.0,
+    "published": "2002-12-31T05:00:00.000"
+  },
+  {
+    "id": "CVE-2002-2417",
+    "cwe": "CWE-287",
+    "description": "acFTP 1.4 does not properly handle when an invalid password is provided by the user during authentication, which allows remote attackers to hide or misrepresent certain activity from log files and possibly gain privileges.",
+    "cvss_score": 10.0,
+    "published": "2002-12-31T05:00:00.000"
+  },
+  {
+    "id": "CVE-2003-0216",
+    "cwe": "CWE-287",
+    "description": "Unknown vulnerability in Cisco Catalyst 7.5(1) allows local users to bypass authentication and gain access to the enable mode without a password.",
+    "cvss_score": 9.3,
+    "published": "2003-05-12T04:00:00.000"
+  },
+  {
+    "id": "CVE-2003-1343",
+    "cwe": "CWE-287",
+    "description": "Trend Micro ScanMail for Exchange (SMEX) before 3.81 and before 6.1 might install a back door account in smg_Smxcfg30.exe, which allows remote attackers to gain access to the web management interface via the vcc parameter, possibly \"3560121183d3\".",
+    "cvss_score": 7.5,
+    "published": "2003-12-31T05:00:00.000"
+  },
+  {
+    "id": "CVE-2003-1433",
+    "cwe": "CWE-287",
+    "description": "Epic Games Unreal Engine 226f through 436 does not validate the challenge key, which allows remote attackers to exhaust the player limit by joining the game multiple times.",
+    "cvss_score": 4.3,
+    "published": "2003-12-31T05:00:00.000"
+  },
+  {
+    "id": "CVE-2003-1434",
+    "cwe": "CWE-287",
+    "description": "login_ldap 3.1 and 3.2 allows remote attackers to initiate unauthenticated bind requests if (1) bind_anon_dn is on, which allows a bind with no password provided, (2) bind_anon_cred is on, which allows a bind with no DN, or (3) bind_anon is on, which allows a bind with no DN or password.",
+    "cvss_score": 6.8,
+    "published": "2003-12-31T05:00:00.000"
+  },
+  {
+    "id": "CVE-2003-1442",
+    "cwe": "CWE-287",
+    "description": "The web administration page for the Ericsson HM220dp ADSL modem does not require authentication, which could allow remote attackers to gain access from the LAN side.",
+    "cvss_score": 7.5,
+    "published": "2003-12-31T05:00:00.000"
+  },
+  {
+    "id": "CVE-2003-1475",
+    "cwe": "CWE-287",
+    "description": "Netbus 1.5 through 1.7 allows more than one client to be connected at the same time, but only prompts the first connection for authentication, which allows remote attackers to gain access.",
+    "cvss_score": 6.8,
+    "published": "2003-12-31T05:00:00.000"
+  },
+  {
+    "id": "CVE-2003-1489",
+    "cwe": "CWE-287",
+    "description": "upload.php in Truegalerie 1.0 allows remote attackers to read arbitrary files by specifying the target filename in the file cookie in form.php, then downloading the file from the image gallery.",
+    "cvss_score": 5.0,
+    "published": "2003-12-31T05:00:00.000"
+  },
+  {
+    "id": "CVE-2004-1760",
+    "cwe": "CWE-287",
+    "description": "The default installation of Cisco voice products, when running the IBM Director Agent on IBM servers before OS 2000.2.6, does not require authentication, which allows remote attackers to gain administrator privileges by connecting to TCP port 14247.",
+    "cvss_score": 10.0,
+    "published": "2004-01-21T05:00:00.000"
+  },
+  {
+    "id": "CVE-2004-2182",
+    "cwe": "CWE-287",
+    "description": "Session fixation vulnerability in Macromedia JRun 4.0 allows remote attackers to hijack user sessions by pre-setting the user session ID information used by the session server.",
+    "cvss_score": 7.5,
+    "published": "2004-12-31T05:00:00.000"
+  },
+  {
+    "id": "CVE-2004-2715",
+    "cwe": "CWE-287",
+    "description": "edituser.php3 in PHPMyChat 0.14.5 allow remote attackers to bypass authentication and gain administrative privileges by setting the do_not_login parameter to false.",
+    "cvss_score": 7.5,
+    "published": "2004-12-31T05:00:00.000"
+  }
+]

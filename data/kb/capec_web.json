@@ -1,0 +1,316 @@
+[
+  {
+    "id": "139",
+    "name": "Relative Path Traversal",
+    "description": "An attacker exploits a weakness in input validation on the target by supplying a specially constructed path utilizing dot and slash characters for the purpose of obtaining access to arbitrary files or resources. An attacker modifies a known path on the target in order to reach material that is not available through intended channels. These attacks normally involve adding additional path separators (/ or \\) and/or dots (.), or encodings thereof, in various combinations in order to reach parent directories or entirely separate trees of the target's directory structure.",
+    "attack_steps": [
+      "[Fingerprinting of the operating system] In order to perform a valid path traversal, the adversary needs to know what the underlying OS is so that the proper file seperator is used.",
+      "[Survey application] Using manual or automated means, an adversary will survey the target application looking for all areas where user input is taken to specify a file name or path.",
+      "[Attempt variations on input parameters] Using manual or automated means, an adversary attempts varying relative file path combinations on all found user input locations and observes the responses.",
+      "[Access, modify, or execute arbitrary files.] An adversary injects path traversal syntax into identified vulnerable inputs to cause inappropriate reading, writing or execution of files. An adversary c"
+    ],
+    "examples": [],
+    "cwes": [
+      "23"
+    ],
+    "prerequisites": [
+      "The target application must accept a string as user input, fail to sanitize combinations of characters in the input that have a special meaning in the"
+    ]
+  },
+  {
+    "id": "194",
+    "name": "Fake the Source of Data",
+    "description": "An adversary takes advantage of improper authentication to provide data or services under a falsified identity. The purpose of using the falsified identity may be to prevent traceability of the provided data or to assume the rights granted to another individual. One of the simplest forms of this attack would be the creation of an email message with a modified \"From\" field in order to appear that the message was sent from someone other than the actual sender. The root of the attack (in this case the email system) fails to properly authenticate the source and this results in the reader incorrect",
+    "attack_steps": [],
+    "examples": [],
+    "cwes": [
+      "287"
+    ],
+    "prerequisites": [
+      "This attack is only applicable when a vulnerable entity associates data or services with an identity. Without such an association, there would be no r"
+    ]
+  },
+  {
+    "id": "196",
+    "name": "Session Credential Falsification through Forging",
+    "description": "An attacker creates a false but functional session credential in order to gain or usurp access to a service. Session credentials allow users to identify themselves to a service after an initial authentication without needing to resend the authentication information (usually a username and password) with every message. If an attacker is able to forge valid session credentials they may be able to bypass authentication or piggy-back off some other authenticated user's session. This attack differs from Reuse of Session IDs and Session Sidejacking attacks in that in the latter attacks an attacker u",
+    "attack_steps": [
+      "[Analyze and Understand Session IDs] The attacker finds that the targeted application use session credentials to identify legitimate users.",
+      "[Create Session IDs.] Attackers craft messages containing their forged credentials in GET, POST request, HTTP headers or cookies.",
+      "[Abuse the Victim's Session Credentials] The attacker fixates falsified session ID to the victim when victim access the system. Once the victim has achieved a higher level of privilege, possibly by lo"
+    ],
+    "examples": [],
+    "cwes": [
+      "384",
+      "664"
+    ],
+    "prerequisites": [
+      "The targeted application must use session credentials to identify legitimate users. Session identifiers that remains unchanged when the privilege leve"
+    ]
+  },
+  {
+    "id": "198",
+    "name": "XSS Targeting Error Pages",
+    "description": "An adversary distributes a link (or possibly some other query structure) with a request to a third party web server that is malformed and also contains a block of exploit code in order to have the exploit become live code in the resulting error page.",
+    "attack_steps": [
+      "[Survey the application for user-controllable inputs as URL parameters] Using a browser or an automated tool, an adversary follows all public links and actions on a web site. They record all the links",
+      "[Cause application to return error page] The adversary uses the URLs gathered in the \"Explore\" phase as a target list and injects various common script payloads and special characters into the paramet",
+      "[Craft malicious XSS URL] Once the adversary has determined which parameters are vulnerable to XSS through an error page, they will craft a malicious URL containing the XSS exploit. The adversary can ",
+      "[Get victim to click URL] In order for the attack to be successful, the victim needs to access the malicious URL."
+    ],
+    "examples": [],
+    "cwes": [
+      "81"
+    ],
+    "prerequisites": [
+      "A third party web server which fails to adequately sanitize messages sent in error pages.",
+      "The victim must be made to execute a query crafted by the adversary which results in the infected error report."
+    ]
+  },
+  {
+    "id": "212",
+    "name": "Functionality Misuse",
+    "description": "An adversary leverages a legitimate capability of an application in such a way as to achieve a negative technical impact. The system functionality is not altered or modified but used in a way that was not intended. This is often accomplished through the overuse of a specific functionality or by leveraging functionality with design flaws that enables the adversary to gain access to unauthorized, sensitive data.",
+    "attack_steps": [],
+    "examples": [],
+    "cwes": [
+      "1242",
+      "1246",
+      "1281"
+    ],
+    "prerequisites": [
+      "The adversary has the capability to interact with the application directly.The target system does not adequately implement safeguards to prevent misus"
+    ]
+  },
+  {
+    "id": "35",
+    "name": "Leverage Executable Code in Non-Executable Files",
+    "description": "An attack of this type exploits a system's trust in configuration and resource files. When the executable loads the resource (such as an image file or configuration file) the attacker has modified the file to either execute malicious code directly or manipulate the target process (e.g. application server) to execute based on the malicious configuration parameters. Since systems are increasingly interrelated mashing up resources from local and remote sources the possibility of this attack occurring is high.",
+    "attack_steps": [],
+    "examples": [],
+    "cwes": [
+      "94",
+      "96",
+      "95",
+      "97",
+      "272"
+    ],
+    "prerequisites": [
+      "The attacker must have the ability to modify non-executable files consumed by the target software."
+    ]
+  },
+  {
+    "id": "43",
+    "name": "Exploiting Multiple Input Interpretation Layers",
+    "description": "An attacker supplies the target software with input data that contains sequences of special characters designed to bypass input validation logic. This exploit relies on the target making multiples passes over the input data and processing a \"layer\" of special characters with each pass. In this manner, the attacker can disguise input that would otherwise be rejected as invalid by concealing it with layers of special/escape characters that are stripped off by subsequent processing steps. The goal is to first discover cases where the input validation layer executes before one or more parsing laye",
+    "attack_steps": [
+      "[Determine application/system inputs where bypassing input validation is desired] The attacker first needs to determine all of the application's/system's inputs where input validation is being perform",
+      "[Determine which character encodings are accepted by the application/system] The attacker then needs to provide various character encodings to the application/system and determine which ones are accep",
+      "[Combine multiple encodings accepted by the application.] The attacker now combines encodings accepted by the application. The attacker may combine different encodings or apply the same encoding multi",
+      "[Leverage ability to bypass input validation] Attacker leverages their ability to bypass input validation to gain unauthorized access to system. There are many attacks possible, and a few examples are"
+    ],
+    "examples": [],
+    "cwes": [
+      "179",
+      "181",
+      "184",
+      "183",
+      "77"
+    ],
+    "prerequisites": [
+      "User input is used to construct a command to be executed on the target system or as part of the file name.",
+      "Multiple parser passes are performed on the data supplied by the user."
+    ]
+  },
+  {
+    "id": "588",
+    "name": "DOM-Based XSS",
+    "description": "This type of attack is a form of Cross-Site Scripting (XSS) where a malicious script is inserted into the client-side HTML being parsed by a web browser. Content served by a vulnerable web application includes script code used to manipulate the Document Object Model (DOM). This script code either does not properly validate input, or does not perform proper output encoding, thus creating an opportunity for an adversary to inject a malicious script launch a XSS attack. A key distinction between other XSS attacks and DOM-based attacks is that in other XSS attacks, the malicious script runs when t",
+    "attack_steps": [
+      "[Survey the application for user-controllable inputs] Using a browser or an automated tool, an adversary follows all public links and actions on a web site. They record all the links, the forms, the r",
+      "[Probe identified potential entry points for DOM-based XSS vulnerability] The adversary uses the entry points gathered in the \"Explore\" phase as a target list and injects various common script payload",
+      "[Craft malicious XSS URL] Once the adversary has determined which parameters are vulnerable to XSS, they will craft a malicious URL containing the XSS exploit. The adversary can have many goals, from ",
+      "[Get victim to click URL] In order for the attack to be successful, the victim needs to access the malicious URL."
+    ],
+    "examples": [],
+    "cwes": [
+      "79",
+      "20",
+      "83"
+    ],
+    "prerequisites": [
+      "An application that leverages a client-side web browser with scripting enabled.",
+      "An application that manipulates the DOM via client-side scripting.",
+      "An application that failS to adequately sanitize or encode untrusted input."
+    ]
+  },
+  {
+    "id": "60",
+    "name": "Reusing Session IDs (aka Session Replay)",
+    "description": "This attack targets the reuse of valid session ID to spoof the target system in order to gain privileges. The attacker tries to reuse a stolen session ID used previously during a transaction to perform spoofing and session hijacking. Another name for this type of attack is Session Replay.",
+    "attack_steps": [
+      "The attacker interacts with the target host and finds that session IDs are used to authenticate users.",
+      "The attacker steals a session ID from a valid user.",
+      "The attacker tries to use the stolen session ID to gain access to the system with the privileges of the session ID's original owner."
+    ],
+    "examples": [],
+    "cwes": [
+      "294",
+      "290",
+      "346",
+      "384",
+      "488"
+    ],
+    "prerequisites": [
+      "The target host uses session IDs to keep track of the users.",
+      "Session IDs are used to control access to resources.",
+      "The session IDs used by the target host are not well protected from session theft."
+    ]
+  },
+  {
+    "id": "62",
+    "name": "Cross Site Request Forgery",
+    "description": "An attacker crafts malicious web links and distributes them (via web pages, email, etc.), typically in a targeted manner, hoping to induce users to click on the link and execute the malicious action against some third-party application. If successful, the action embedded in the malicious link will be processed and accepted by the targeted application with the users' privilege level. This type of attack leverages the persistence and implicit trust placed in user session cookies by many web applications today. In such an architecture, once the user authenticates to an application and a session c",
+    "attack_steps": [
+      "[Explore target website] The attacker first explores the target website to determine pieces of functionality that are of interest to them (e.g. money transfers). The attacker will need a legitimate us",
+      "[Create a link that when clicked on, will execute the interesting functionality.] The attacker needs to create a link that will execute some interesting functionality such as transfer money, change a ",
+      "[Convince user to click on link] Finally, the attacker needs to convince a user that is logged into the target website to click on a link to execute the CSRF attack."
+    ],
+    "examples": [],
+    "cwes": [
+      "352",
+      "306",
+      "664",
+      "732",
+      "1275"
+    ],
+    "prerequisites": []
+  },
+  {
+    "id": "66",
+    "name": "SQL Injection",
+    "description": "This attack exploits target software that constructs SQL statements based on user input. An attacker crafts input strings so that when the target software constructs SQL statements based on the input, the resulting SQL statement performs actions other than those the application intended. SQL Injection results from failure of the application to appropriately validate input.",
+    "attack_steps": [
+      "[Survey application] The attacker first takes an inventory of the functionality exposed by the application.",
+      "[Determine user-controllable input susceptible to injection] Determine the user-controllable input susceptible to injection. For each user-controllable input that the attacker suspects is vulnerable t",
+      "[Experiment with SQL Injection vulnerabilities] After determining that a given input is vulnerable to SQL Injection, hypothesize what the underlying query looks like. Iteratively try to add logic to t",
+      "[Exploit SQL Injection vulnerability] After refining and adding various logic to SQL queries, craft and execute the underlying SQL query that will be used to attack the target system. The goal is to r"
+    ],
+    "examples": [],
+    "cwes": [
+      "89",
+      "1286"
+    ],
+    "prerequisites": [
+      "SQL queries used by the application to store, retrieve or modify data.",
+      "User-controllable input that is not properly validated by the application as part of SQL queries."
+    ]
+  },
+  {
+    "id": "7",
+    "name": "Blind SQL Injection",
+    "description": "Blind SQL Injection results from an insufficient mitigation for SQL Injection. Although suppressing database error messages are considered best practice, the suppression alone is not sufficient to prevent SQL Injection. Blind SQL Injection is a form of SQL Injection that overcomes the lack of error messages. Without the error messages that facilitate SQL Injection, the adversary constructs input strings that probe the target through simple Boolean SQL expressions. The adversary can determine if the syntax and structure of the injection was successful based on whether the query was executed or ",
+    "attack_steps": [
+      "[Hypothesize SQL queries in application]",
+      "[Determine how to inject information into the queries]",
+      "[Determine user-controllable input susceptible to injection] Determine the user-controllable input susceptible to injection. For each user-controllable input that the adversary suspects is vulnerable ",
+      "[Determine database type] Determines the type of the database, such as MS SQL Server or Oracle or MySQL, using logical conditions as part of the injected queries",
+      "[Extract information about database schema] Extract information about database schema by getting the database to answer yes/no questions about the schema."
+    ],
+    "examples": [],
+    "cwes": [
+      "89",
+      "209",
+      "74",
+      "20",
+      "697"
+    ],
+    "prerequisites": [
+      "SQL queries used by the application to store, retrieve or modify data.",
+      "User-controllable input that is not properly validated by the application as part of SQL queries."
+    ]
+  },
+  {
+    "id": "76",
+    "name": "Manipulating Web Input to File System Calls",
+    "description": "An attacker manipulates inputs to the target software which the target software passes to file system calls in the OS. The goal is to gain access to, and perhaps modify, areas of the file system that the target software did not intend to be accessible.",
+    "attack_steps": [
+      "[Fingerprinting of the operating system] In order to create a valid file injection, the attacker needs to know what the underlying OS is so that the proper file seperator is used.",
+      "[Survey the Application to Identify User-controllable Inputs] The attacker surveys the target application to identify all user-controllable inputs, possibly as a valid and authenticated user",
+      "[Vary inputs, looking for malicious results] Depending on whether the application being exploited is a remote or local one, the attacker crafts the appropriate malicious input containing the path of t",
+      "[Manipulate files accessible by the application] The attacker may steal information or directly manipulate files (delete, copy, flush, etc.)"
+    ],
+    "examples": [],
+    "cwes": [
+      "23",
+      "22",
+      "73",
+      "77",
+      "346"
+    ],
+    "prerequisites": [
+      "Program must allow for user controlled variables to be applied directly to the filesystem"
+    ]
+  },
+  {
+    "id": "86",
+    "name": "XSS Through HTTP Headers",
+    "description": "An adversary exploits web applications that generate web content, such as links in a HTML page, based on unvalidated or improperly validated data submitted by other actors. XSS in HTTP Headers attacks target the HTTP headers which are hidden from most users and may not be validated by web applications.",
+    "attack_steps": [
+      "[Survey the application for public links] Using a browser or an automated tool, an adversary follows all public links on a web site. They record all the entry points (input) that becomes part of gener",
+      "[Probe identified potential entry points for XSS vulnerability]",
+      "[Craft malicious XSS URL] Once the adversary has determined which parameters are vulnerable to XSS, they will craft a malicious URL containing the XSS exploit. The adversary can have many goals, from ",
+      "[Get victim to click URL] In order for the attack to be successful, the victim needs to access the malicious URL."
+    ],
+    "examples": [],
+    "cwes": [
+      "80"
+    ],
+    "prerequisites": [
+      "Target software must be a client that allows scripting communication from remote hosts."
+    ]
+  },
+  {
+    "id": "88",
+    "name": "OS Command Injection",
+    "description": "In this type of an attack, an adversary injects operating system commands into existing application functions. An application that uses untrusted input to build command strings is vulnerable. An adversary can leverage OS command injection in an application to elevate privileges, execute arbitrary commands and compromise the underlying operating system.",
+    "attack_steps": [
+      "[Identify inputs for OS commands] The attacker determines user controllable input that gets passed as part of a command to the underlying operating system.",
+      "[Survey the Application] The attacker surveys the target application, possibly as a valid and authenticated user",
+      "[Vary inputs, looking for malicious results.] Depending on whether the application being exploited is a remote or local one the attacker crafts the appropriate malicious input, containing OS commands,",
+      "[Execute malicious commands] The attacker may steal information, install a back door access mechanism, elevate privileges or compromise the system in some other way."
+    ],
+    "examples": [],
+    "cwes": [
+      "78",
+      "88",
+      "20",
+      "697"
+    ],
+    "prerequisites": [
+      "User controllable input used as part of commands to the underlying operating system."
+    ]
+  },
+  {
+    "id": "97",
+    "name": "Cryptanalysis",
+    "description": "Cryptanalysis is a process of finding weaknesses in cryptographic algorithms and using these weaknesses to decipher the ciphertext without knowing the secret key (instance deduction). Sometimes the weakness is not in the cryptographic algorithm itself, but rather in how it is applied that makes cryptanalysis successful. An attacker may have other goals as well, such as: Total Break (finding the secret key), Global Deduction (finding a functionally equivalent algorithm for encryption and decryption that does not require knowledge of the secret key), Information Deduction (gaining some informati",
+    "attack_steps": [
+      "An attacker discovers a weakness in the cryptographic algorithm or a weakness in how it was applied to a particular chunk of plaintext.",
+      "An attacker leverages the discovered weakness to decrypt, partially decrypt or infer some information about the contents of the encrypted message. All of that is done without knowing the secret key."
+    ],
+    "examples": [],
+    "cwes": [
+      "327",
+      "1204",
+      "1240",
+      "1241",
+      "1279"
+    ],
+    "prerequisites": [
+      "The target software utilizes some sort of cryptographic algorithm.",
+      "An underlying weaknesses exists either in the cryptographic algorithm used or in the way that it was applied to a particular chunk of plaintext.",
+      "The encryption algorithm is known to the attacker."
+    ]
+  }
+]
