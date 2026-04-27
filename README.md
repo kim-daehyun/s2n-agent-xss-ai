@@ -33,12 +33,12 @@ After:  URL/DOM/SiteMap/response → S2N-Agent reasoning → Plugin selection + 
 
 ## AI 모드 / AI Modes
 
-| Mode | 동작 | Behavior |
-|------|------|----------|
-| `off` | AI 없음, 기존 S2N 그대로 | Vanilla S2N, no AI |
-| `assist` | AI 권고만 로그 출력, 실행은 기존 방식 | AI recommendations in log only |
-| `smart` | AI가 플러그인 자동 선택 | AI selects plugins autonomously |
-| `aggressive` | AI 멀티스텝 공격 체인 계획 | AI plans multi-step attack chains |
+| Mode         | 동작                                  | Behavior                          |
+| ------------ | ------------------------------------- | --------------------------------- |
+| `off`        | AI 없음, 기존 S2N 그대로              | Vanilla S2N, no AI                |
+| `assist`     | AI 권고만 로그 출력, 실행은 기존 방식 | AI recommendations in log only    |
+| `smart`      | AI가 플러그인 자동 선택               | AI selects plugins autonomously   |
+| `aggressive` | AI 멀티스텝 공격 체인 계획            | AI plans multi-step attack chains |
 
 ---
 
@@ -70,10 +70,10 @@ pip install "s2n-agent[dev]"
 
 ## S2N 통합 / S2N Integration
 
-S2N v0.3.2부터 `--ai-mode` 옵션이 내장됩니다.
+S2N v1.0.0부터 `--ai-mode` 옵션이 내장됩니다.
 S2N 스캐너를 최신 버전으로 업데이트하면 자동으로 사용 가능합니다.
 
-S2N v0.3.2+ includes built-in `--ai-mode` support. Update S2N to the latest version to use it.
+S2N v1.0.0+ includes built-in `--ai-mode` support. Update S2N to the latest version to use it.
 
 ### CLI 사용법 / CLI Usage
 
@@ -163,13 +163,13 @@ python3 scripts/split_data.py
 
 **데이터 통계 (기본 생성 기준):**
 
-| 태스크 | 내용 | 샘플 수 |
-|--------|------|--------|
-| A — Plugin Selection | URL/DOM → 플러그인 선택 | 1,200 |
-| B — Payload Planning | 플러그인 → 페이로드 목록 | 800 |
-| C — False Positive Filter | Finding → FP 판별 | 1,200 |
-| D — Multi-step Planner | 진행 상황 → 다음 액션 | 800 |
-| **합계** | | **4,000** |
+| 태스크                    | 내용                     | 샘플 수   |
+| ------------------------- | ------------------------ | --------- |
+| A — Plugin Selection      | URL/DOM → 플러그인 선택  | 1,200     |
+| B — Payload Planning      | 플러그인 → 페이로드 목록 | 800       |
+| C — False Positive Filter | Finding → FP 판별        | 1,200     |
+| D — Multi-step Planner    | 진행 상황 → 다음 액션    | 800       |
+| **합계**                  |                          | **4,000** |
 
 ### 2단계: LoRA 학습 / Step 2: LoRA Training
 
@@ -195,9 +195,9 @@ mlx_lm.lora --config configs/lora_3b.yaml
 
 **모델 권장 사양:**
 
-| 모델 | VRAM | 용도 |
-|------|------|------|
-| Qwen2.5-Coder-3B-4bit | ~4 GB | 빠른 실험 |
+| 모델                  | VRAM  | 용도        |
+| --------------------- | ----- | ----------- |
+| Qwen2.5-Coder-3B-4bit | ~4 GB | 빠른 실험   |
 | Qwen2.5-Coder-7B-4bit | ~8 GB | 실전 (권장) |
 
 ### 3단계: 평가 / Step 3: Evaluation
@@ -219,11 +219,11 @@ python3 scripts/evaluate.py --adapter ollama --max-samples 100
 
 **목표 지표 / Target Metrics:**
 
-| 지표 | 목표 | Metric | Target |
-|------|------|--------|--------|
-| Plugin 선택 정확도 | 85%+ | Plugin selection accuracy | 85%+ |
-| False Positive 감소율 | 30%+ | FP reduction rate | 30%+ |
-| JSON 파싱 성공률 | 95%+ | JSON parse success rate | 95%+ |
+| 지표                  | 목표 | Metric                    | Target |
+| --------------------- | ---- | ------------------------- | ------ |
+| Plugin 선택 정확도    | 85%+ | Plugin selection accuracy | 85%+   |
+| False Positive 감소율 | 30%+ | FP reduction rate         | 30%+   |
+| JSON 파싱 성공률      | 95%+ | JSON parse success rate   | 95%+   |
 
 ---
 
@@ -358,31 +358,31 @@ report = scanner.scan()
 S2N-Agent가 선택할 수 있는 플러그인과 ATT&CK 매핑.
 Plugins available for AI selection and their ATT&CK mappings.
 
-| Plugin | TID | Tactic |
-|--------|-----|--------|
-| `xss` | T1059.007 | Execution |
-| `sqlinjection` | T1190 | Initial Access |
-| `oscommand` | T1059 | Execution |
-| `csrf` | T1185 | Collection |
-| `file_upload` | T1505.003 | Persistence |
-| `brute_force` | T1110 | Credential Access |
-| `soft_brute_force` | T1110 | Credential Access |
-| `jwt` | T1528 | Credential Access |
-| `autobot` | T1190 | Initial Access |
-| `path_traversal` | T1083 | Discovery |
-| `sensitive_files` | T1552.001 | Credential Access |
-| `react2shell` | T1505.003 | Persistence |
+| Plugin             | TID       | Tactic            |
+| ------------------ | --------- | ----------------- |
+| `xss`              | T1059.007 | Execution         |
+| `sqlinjection`     | T1190     | Initial Access    |
+| `oscommand`        | T1059     | Execution         |
+| `csrf`             | T1185     | Collection        |
+| `file_upload`      | T1505.003 | Persistence       |
+| `brute_force`      | T1110     | Credential Access |
+| `soft_brute_force` | T1110     | Credential Access |
+| `jwt`              | T1528     | Credential Access |
+| `autobot`          | T1190     | Initial Access    |
+| `path_traversal`   | T1083     | Discovery         |
+| `sensitive_files`  | T1552.001 | Credential Access |
+| `react2shell`      | T1505.003 | Persistence       |
 
 ---
 
 ## 개발 로드맵 / Development Roadmap
 
-| 주차 | 상태 | 작업 |
-|------|------|------|
-| Week 1 | ✅ 완료 | ScannerConfig AI 필드, CLI 옵션, 패키지 구조, Ollama/HF 클라이언트, Tasks A-D, 4,000 샘플 생성 |
-| Week 2 | ✅ 완료 | train/val/test 분리, LoRA 설정(3B/7B), 학습 스크립트, 평가 스크립트, Ollama 배포 자동화 |
-| Week 3 | 🔄 진행 예정 | Payload Planner 고도화, `on_finding` 실시간 피드백 연결 |
-| Week 4 | ⏳ 예정 | Ollama 실전 배포, CLI `--ai-mode` 공개, 벤치마크 |
+| 주차   | 상태         | 작업                                                                                           |
+| ------ | ------------ | ---------------------------------------------------------------------------------------------- |
+| Week 1 | ✅ 완료      | ScannerConfig AI 필드, CLI 옵션, 패키지 구조, Ollama/HF 클라이언트, Tasks A-D, 4,000 샘플 생성 |
+| Week 2 | ✅ 완료      | train/val/test 분리, LoRA 설정(3B/7B), 학습 스크립트, 평가 스크립트, Ollama 배포 자동화        |
+| Week 3 | 🔄 진행 예정 | Payload Planner 고도화, `on_finding` 실시간 피드백 연결                                        |
+| Week 4 | ⏳ 예정      | Ollama 실전 배포, CLI `--ai-mode` 공개, 벤치마크                                               |
 
 ---
 
