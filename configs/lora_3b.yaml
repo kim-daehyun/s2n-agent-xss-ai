@@ -1,0 +1,52 @@
+# S2N-Agent LoRA 학습 설정 — Qwen2.5-Coder 3B (실험/빠른 반복용)
+#
+# 실행:
+#   python3 scripts/train.py --config configs/lora_3b.yaml
+#
+# 직접 mlx-lm 실행:
+#   mlx_lm.lora --config configs/lora_3b.yaml
+
+# ── 모델 ──────────────────────────────────────────────────────────────────────
+model: "mlx-community/Qwen2.5-Coder-3B-Instruct-4bit"
+
+# ── 데이터 ────────────────────────────────────────────────────────────────────
+# mlx-lm은 data/ 디렉토리에서 train.jsonl / valid.jsonl 을 자동 탐색
+data: "data"
+train: true
+
+# ── LoRA 하이퍼파라미터 ────────────────────────────────────────────────────────
+# rank: 낮을수록 빠름/경량, 높을수록 표현력 ↑
+lora_rank: 8
+lora_alpha: 16         # alpha/rank = 2 (일반 권장값)
+lora_dropout: 0.05
+
+# 어떤 레이어에 LoRA를 적용할지
+# Qwen2.5 아키텍처: q_proj, v_proj 가 기본 최소 세트
+lora_layers:
+  - "q_proj"
+  - "v_proj"
+  - "k_proj"
+  - "o_proj"
+
+# ── 학습 설정 ─────────────────────────────────────────────────────────────────
+num_layers: 16          # 전체 레이어 중 학습에 참여할 레이어 수 (3B는 36층)
+batch_size: 4
+grad_checkpoint: true  # 메모리 절약 (M1/M2/M3 8GB 대응)
+learning_rate: 1.0e-4
+lr_schedule: "cosine"   # cosine decay
+warmup_steps: 50
+
+# 총 반복 횟수: 3200 samples / batch_size 4 ≈ 800 steps/epoch
+# 2 epoch 기준 → 1600 iters
+iters: 1600
+val_batches: 25         # validation 시 배치 수
+save_every: 200         # adapter 체크포인트 저장 주기
+
+# ── 출력 ──────────────────────────────────────────────────────────────────────
+adapter_path: "lora-out/3b"
+
+# ── 시퀀스 길이 ───────────────────────────────────────────────────────────────
+max_seq_length: 512     # 대부분의 샘플이 300토큰 이하
+
+# ── 기타 ──────────────────────────────────────────────────────────────────────
+seed: 42

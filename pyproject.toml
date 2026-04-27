@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "s2n-agent"
+version = "0.1.0"
+description = "LLM-powered decision layer for the S2N web vulnerability scanner"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+dependencies = [
+    "httpx>=0.27",
+    "pydantic>=2.0",
+]
+
+[project.optional-dependencies]
+huggingface = [
+    "transformers>=4.40",
+    "torch>=2.2",
+    "accelerate>=0.29",
+    "peft>=0.10",
+]
+train = [
+    "mlx-lm>=0.14; sys_platform == 'darwin'",
+    "datasets>=2.18",
+    "trl>=0.8",
+]
+dev = [
+    "pytest>=8",
+    "pytest-asyncio>=0.23",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["s2nagent*"]
