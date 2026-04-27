@@ -2,55 +2,63 @@
 #
 # 실행:
 #   python3 scripts/train.py --config configs/lora_3b.yaml
+#   python3 scripts/train.py --config configs/lora_3b.yaml --epochs 5
 #
-# 직접 mlx-lm 실행:
-#   python3 -m mlx_lm lora --config configs/lora_3b.yaml
+# M1 Mac Mini 8GB:  batch_size: 4  (기본값)
+# M1 Mac Mini 16GB: batch_size: 8  (train.py가 자동 감지)
 
 # ── 모델 ──────────────────────────────────────────────────────────────────────
 model: "mlx-community/Qwen2.5-Coder-3B-Instruct-4bit"
 
 # ── 데이터 ────────────────────────────────────────────────────────────────────
-# mlx-lm은 data/ 디렉토리에서 train.jsonl / valid.jsonl 을 자동 탐색
 data: "data"
 train: true
 
 # ── LoRA 하이퍼파라미터 ────────────────────────────────────────────────────────
-# rank: 낮을수록 빠름/경량, 높을수록 표현력 ↑
-lora_rank: 8
-lora_alpha: 16         # alpha/rank = 2 (일반 권장값)
+# rank 16: 4K 데이터셋에서 rank 8보다 표현력 향상, 메모리 영향 미미
+lora_rank: 16
+lora_alpha: 32          # alpha = 2 * rank (표준 권장)
 lora_dropout: 0.05
 
-# 어떤 레이어에 LoRA를 적용할지
-# Qwen2.5 아키텍처: q_proj, v_proj 가 기본 최소 세트
+# attention + MLP gate 포함 → rank 8 대비 Task B/D 성능 향상
 lora_layers:
   - "q_proj"
   - "v_proj"
   - "k_proj"
   - "o_proj"
+  - "gate_proj"
+  - "up_proj"
 
 # ── 학습 설정 ─────────────────────────────────────────────────────────────────
-num_layers: 16          # 전체 레이어 중 학습에 참여할 레이어 수 (3B는 36층)
+# num_layers: 3B 전체 36층 중 상위 절반만 학습 (하위 레이어는 frozen)
+# 낮은 레이어일수록 일반 언어 능력 → 건드리지 않는 게 유리
+num_layers: 18
 batch_size: 4
-grad_checkpoint: true  # 메모리 절약 (M1/M2/M3 8GB 대응)
-learning_rate: 1.0e-4
-# lr_schedule: mlx-lm은 문자열이 아닌 dict를 기대함.
-# cosine decay가 필요하면 아래 형식 사용:
-# lr_schedule:
-#   name: cosine_decay
-#   warmup: 50
-#   arguments: [1.0e-5, 1600]  # [min_lr, decay_steps]
+grad_checkpoint: true   # M1 메모리 절약 필수
 
-# 총 반복 횟수: 3200 samples / batch_size 4 ≈ 800 steps/epoch
-# 2 epoch 기준 → 1600 iters
-iters: 1600
-val_batches: 25         # validation 시 배치 수
-save_every: 200         # adapter 체크포인트 저장 주기
+# ── LR 스케줄: cosine decay with linear warmup ────────────────────────────────
+# warmup 100 steps → 최대 LR 도달 → cosine으로 min_lr까지 감소
+# 파인튜닝에서 warmup 없이 높은 LR로 시작하면 사전학습 지식이 깨짐
+learning_rate: 2.0e-4
+lr_schedule:
+  name: cosine_decay
+  warmup: 100
+  arguments: [1.0e-5, 2000]   # [min_lr, decay_steps]
+  # min_lr = learning_rate / 20 수준이 일반적
+
+# ── 반복 횟수 ─────────────────────────────────────────────────────────────────
+# train.py --epochs N 옵션으로 동적 계산됨 (권장)
+# 직접 지정 시: 3200 samples / batch 4 = 800 steps/epoch → 3 epoch = 2400
+iters: 2400
+steps_per_eval: 100     # 100 iter마다 val loss 계산 (early stopping 기준)
+val_batches: 25
+save_every: 200         # 체크포인트 저장 주기
 
 # ── 출력 ──────────────────────────────────────────────────────────────────────
 adapter_path: "lora-out/3b"
 
 # ── 시퀀스 길이 ───────────────────────────────────────────────────────────────
-max_seq_length: 512     # 대부분의 샘플이 300토큰 이하
+max_seq_length: 512
 
 # ── 기타 ──────────────────────────────────────────────────────────────────────
 seed: 42

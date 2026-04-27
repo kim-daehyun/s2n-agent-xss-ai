@@ -2,9 +2,10 @@
 #
 # 실행:
 #   python3 scripts/train.py --config configs/lora_7b.yaml
-#   python3 -m mlx_lm lora --config configs/lora_7b.yaml
+#   python3 scripts/train.py --config configs/lora_7b.yaml --epochs 3
 #
-# 요구 메모리: ~14GB (4-bit 양자화 기준) — M1 16GB 이상 권장, M3 Pro/Max 최적
+# 요구 메모리: ~12GB (4-bit 양자화 + LoRA + grad_checkpoint)
+# → M1 Mac Mini 16GB 이상 권장
 
 # ── 모델 ──────────────────────────────────────────────────────────────────────
 model: "mlx-community/Qwen2.5-Coder-7B-Instruct-4bit"
@@ -23,23 +24,27 @@ lora_layers:
   - "v_proj"
   - "k_proj"
   - "o_proj"
-  - "gate_proj"         # 7B는 MLP gate도 포함하면 성능 향상
+  - "gate_proj"
   - "up_proj"
 
 # ── 학습 설정 ─────────────────────────────────────────────────────────────────
-num_layers: 28          # 7B는 28~32층 — 절반 참여
-batch_size: 2           # 7B는 배치 줄여 메모리 확보
+# 7B는 32층 → 상위 1/3만 학습 (메모리 + 과적합 방지 균형)
+num_layers: 12
+batch_size: 2           # 7B는 배치 2로 메모리 확보
 grad_checkpoint: true
-learning_rate: 5.0e-5   # 7B는 더 낮은 LR 권장
-# lr_schedule: mlx-lm은 문자열이 아닌 dict를 기대함.
-# cosine decay가 필요하면 아래 형식 사용:
-# lr_schedule:
-#   name: cosine_decay
-#   warmup: 100
-#   arguments: [5.0e-6, 3200]  # [min_lr, decay_steps]
 
-# 3200 / 2 = 1600 steps/epoch → 2 epoch = 3200 iters
-iters: 3200
+# ── LR 스케줄 ─────────────────────────────────────────────────────────────────
+learning_rate: 1.0e-4
+lr_schedule:
+  name: cosine_decay
+  warmup: 100
+  arguments: [5.0e-6, 2400]   # [min_lr, decay_steps]
+
+# ── 반복 횟수 ─────────────────────────────────────────────────────────────────
+# 3200 / batch 2 = 1600 steps/epoch → 3 epoch = 4800 → 여유있게 설정
+# early stopping이 실제 최적점에서 멈춰줌
+iters: 4800
+steps_per_eval: 200
 val_batches: 25
 save_every: 400
 
