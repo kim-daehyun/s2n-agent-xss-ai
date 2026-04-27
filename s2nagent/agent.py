@@ -69,6 +69,7 @@ class S2NAgent:
         context: str = "html_body",
         dom_snippet: str = "",
         response_snippet: str = "",
+        previous_attempts: list[str] | None = None,
     ) -> dict[str, Any]:
         """Task B: payload 목록 + bypass 변형 생성."""
         return self._payload.run(
@@ -77,6 +78,7 @@ class S2NAgent:
             context=context,
             dom_snippet=dom_snippet,
             response_snippet=response_snippet,
+            previous_attempts=previous_attempts,
         )
 
     def filter_false_positive(

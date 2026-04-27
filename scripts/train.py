@@ -40,10 +40,6 @@ from typing import Any
 # "Iter 200: Val loss 0.5431, Val took 3.24s"
 _VAL_RE = re.compile(r"Iter\s+(\d+):\s+Val loss\s+([\d.]+)")
 
-# 학습 loss 패턴:
-# "Iter 50: Train loss 1.2345, Learning Rate 2.000e-04, It/sec 1.23, ..."
-_TRAIN_RE = re.compile(r"Iter\s+(\d+):\s+Train loss\s+([\d.]+)")
-
 
 # ── mlx-lm 존재 확인 ──────────────────────────────────────────────────────────
 
@@ -165,15 +161,13 @@ class EarlyStopper:
 def _run_training(
     cmd: list[str],
     patience: int,
-    total_iters: int,
-) -> tuple[EarlyStopper, list[tuple[int, float]]]:
+) -> EarlyStopper:
     """
     mlx-lm 서브프로세스 실행.
     stdout을 실시간으로 파싱해 val loss 추적 + early stopping.
     patience 초과 시 프로세스를 종료합니다.
     """
     stopper = EarlyStopper(patience=patience)
-    train_history: list[tuple[int, float]] = []
     stopped_early = False
 
     proc = subprocess.Popen(
@@ -188,11 +182,6 @@ def _run_training(
     try:
         for line in proc.stdout:  # type: ignore[union-attr]
             print(line, end="", flush=True)
-
-            # train loss 수집
-            tm = _TRAIN_RE.search(line)
-            if tm:
-                train_history.append((int(tm.group(1)), float(tm.group(2))))
 
             # val loss 수집 + early stopping 판단
             vm = _VAL_RE.search(line)
@@ -217,7 +206,7 @@ def _run_training(
         print(f"[오류] 학습 실패 (exit={proc.returncode})")
         sys.exit(proc.returncode)
 
-    return stopper, train_history
+    return stopper
 
 
 # ── 최적 체크포인트 선택 ──────────────────────────────────────────────────────
@@ -391,7 +380,7 @@ def run_training(
 
     eff_patience = patience if not no_early_stop else 999_999
     start = time.time()
-    stopper, _train_hist = _run_training(cmd, eff_patience, iters)
+    stopper = _run_training(cmd, eff_patience)
     elapsed = time.time() - start
 
     # 임시 config 삭제

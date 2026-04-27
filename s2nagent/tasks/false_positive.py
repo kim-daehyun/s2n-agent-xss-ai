@@ -10,9 +10,8 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from s2nagent.constants import FP_VERDICTS
 from s2nagent.tasks.base import BaseTask
-
-_VERDICTS = {"confirmed", "likely_false_positive"}
 
 
 class FalsePositiveTask(BaseTask):
@@ -42,7 +41,7 @@ class FalsePositiveTask(BaseTask):
 
     def parse_response(self, response: dict[str, Any]) -> dict[str, Any]:
         verdict = response.get("verdict", "likely_false_positive").lower()
-        if verdict not in _VERDICTS:
+        if verdict not in FP_VERDICTS:
             verdict = "likely_false_positive"
         return {
             "verdict": verdict,

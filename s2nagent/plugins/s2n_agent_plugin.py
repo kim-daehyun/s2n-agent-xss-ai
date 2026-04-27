@@ -302,7 +302,7 @@ class S2NAgentPlugin:
             logger.debug("[S2N-Agent] followup payload 실패: %s", exc)
 
     def _build_client(self, model: str, endpoint: str) -> Any:
-        from s2nagent.client.ollama import OllamaClient  # noqa: F401
+        from s2nagent.client.ollama import OllamaClient
         client = OllamaClient(endpoint=endpoint, model=model)
         if client.is_available():
             logger.info("[S2N-Agent] Ollama 연결 확인: %s / %s", endpoint, model)
@@ -315,10 +315,14 @@ class S2NAgentPlugin:
     def _summarize_sitemap(pages: list[Any]) -> str:
         if not pages:
             return "no pages crawled"
-        urls = [getattr(p, "url", str(p)) for p in pages[:20]]
-        form_count = sum(1 for p in pages if getattr(p, "has_forms", False))
-        file_input_count = sum(1 for p in pages if getattr(p, "has_file_input", False))
-        login_count = sum(1 for p in pages if getattr(p, "has_login_form", False))
+        urls: list[str] = []
+        form_count = file_input_count = login_count = 0
+        for p in pages:
+            if len(urls) < 20:
+                urls.append(getattr(p, "url", str(p)))
+            form_count += bool(getattr(p, "has_forms", False))
+            file_input_count += bool(getattr(p, "has_file_input", False))
+            login_count += bool(getattr(p, "has_login_form", False))
         return (
             f"{len(pages)} pages, {form_count} with forms, "
             f"{file_input_count} with file inputs, {login_count} login forms. "

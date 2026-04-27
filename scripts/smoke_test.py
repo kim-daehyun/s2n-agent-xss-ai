@@ -62,9 +62,9 @@ _SMOKE_CASES: list[dict[str, Any]] = [
             "response_body": "Welcome to our website. Please enjoy your stay.",
         }),
         "check": lambda r: r.get("verdict") in {
-            "confirmed", "likely_false_positive", "uncertain",
+            "confirmed", "likely_false_positive",
         },
-        "check_desc": "verdict ∈ {confirmed, likely_false_positive, uncertain}",
+        "check_desc": "verdict ∈ {confirmed, likely_false_positive}",
     },
     {
         "name": "Task D — Multi-step Planner",

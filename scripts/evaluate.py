@@ -39,18 +39,14 @@ _TASK_PREFIXES = {
     "d": "You are S2N-Agent. Given the completed plugins",
 }
 
-_AVAILABLE_PLUGINS = {
-    "xss", "sqlinjection", "oscommand", "csrf", "file_upload",
-    "brute_force", "soft_brute_force", "jwt", "autobot",
-    "path_traversal", "sensitive_files", "react2shell",
-}
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from s2nagent.constants import PLUGINS as _AVAILABLE_PLUGINS  # noqa: E402
 
 
 # ── 클라이언트 팩토리 ─────────────────────────────────────────────────────────
 
 def build_client(adapter: str, model: str, endpoint: str) -> Any:
     if adapter == "ollama":
-        sys.path.insert(0, str(Path(__file__).parent.parent))
         from s2nagent.client.ollama import OllamaClient
         return OllamaClient(endpoint=endpoint, model=model)
     else:

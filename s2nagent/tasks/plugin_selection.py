@@ -10,13 +10,8 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from s2nagent.constants import PLUGINS
 from s2nagent.tasks.base import BaseTask
-
-_AVAILABLE_PLUGINS = [
-    "xss", "sqlinjection", "oscommand", "csrf", "file_upload",
-    "brute_force", "soft_brute_force", "jwt", "autobot",
-    "path_traversal", "sensitive_files", "react2shell",
-]
 
 
 class PluginSelectionTask(BaseTask):
@@ -26,7 +21,7 @@ class PluginSelectionTask(BaseTask):
         "You are S2N-Agent, a web vulnerability scanner AI. "
         "Analyze the given web context and select the single most relevant security plugin. "
         "Return ONLY a JSON object: {\"plugin\": \"<name>\", \"confidence\": <0-100>, \"reason\": \"<brief>\"}. "
-        f"Available plugins: {', '.join(_AVAILABLE_PLUGINS)}."
+        f"Available plugins: {', '.join(PLUGINS)}."
     )
 
     def build_prompt(
@@ -46,7 +41,7 @@ class PluginSelectionTask(BaseTask):
 
     def parse_response(self, response: dict[str, Any]) -> dict[str, Any]:
         plugin = response.get("plugin", "").lower()
-        if plugin not in _AVAILABLE_PLUGINS:
+        if plugin not in PLUGINS:
             plugin = "xss"  # 안전한 기본값
         return {
             "plugin": plugin,

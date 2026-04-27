@@ -10,13 +10,8 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from s2nagent.constants import PLUGINS_WITH_STOP
 from s2nagent.tasks.base import BaseTask
-
-_AVAILABLE_PLUGINS = [
-    "xss", "sqlinjection", "oscommand", "csrf", "file_upload",
-    "brute_force", "soft_brute_force", "jwt", "autobot",
-    "path_traversal", "sensitive_files", "react2shell", "stop",
-]
 
 
 class MultiStepPlannerTask(BaseTask):
@@ -27,7 +22,7 @@ class MultiStepPlannerTask(BaseTask):
         "decide the next best action to maximize vulnerability discovery. "
         "Return ONLY a JSON object: "
         "{\"next_action\": \"<plugin_name|stop>\", \"reason\": \"<brief>\", \"priority\": \"high|medium|low\"}. "
-        f"Available actions: {', '.join(_AVAILABLE_PLUGINS)}."
+        f"Available actions: {', '.join(PLUGINS_WITH_STOP)}."
     )
 
     def build_prompt(
@@ -50,7 +45,7 @@ class MultiStepPlannerTask(BaseTask):
 
     def parse_response(self, response: dict[str, Any]) -> dict[str, Any]:
         action = response.get("next_action", "stop").lower()
-        if action not in _AVAILABLE_PLUGINS:
+        if action not in PLUGINS_WITH_STOP:
             action = "stop"
         priority = response.get("priority", "medium").lower()
         if priority not in {"high", "medium", "low"}:

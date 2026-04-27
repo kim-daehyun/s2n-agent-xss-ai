@@ -18,20 +18,11 @@ import sys
 from pathlib import Path
 from typing import Iterator
 
+from s2nagent.constants import PLUGINS as _PLUGINS, SEVERITIES as _SEVERITIES
 from s2nagent.data.schemas import (
     TASK_A_SYSTEM, TASK_B_SYSTEM, TASK_C_SYSTEM, TASK_D_SYSTEM,
     make_sample,
 )
-
-# ── 공통 픽스처 ─────────────────────────────────────────────────────────────
-
-_PLUGINS = [
-    "xss", "sqlinjection", "oscommand", "csrf", "file_upload",
-    "brute_force", "soft_brute_force", "jwt", "autobot",
-    "path_traversal", "sensitive_files", "react2shell",
-]
-
-_SEVERITIES = ["CRITICAL", "HIGH", "MEDIUM", "LOW"]
 
 _XSS_PAYLOADS = [
     "<script>alert(1)</script>",

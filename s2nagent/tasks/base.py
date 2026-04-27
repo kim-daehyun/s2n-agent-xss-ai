@@ -31,10 +31,10 @@ class BaseTask(ABC):
         """태스크별 프롬프트 생성."""
 
     @abstractmethod
-    def parse_response(self, response: dict[str, Any]) -> Any:
+    def parse_response(self, response: dict[str, Any]) -> dict[str, Any]:
         """모델 응답 파싱 및 검증."""
 
-    def run(self, **kwargs: Any) -> Any:
+    def run(self, **kwargs: Any) -> dict[str, Any]:
         """프롬프트 생성 → LLM 호출 → 응답 파싱."""
         prompt = self.build_prompt(**kwargs)
         logger.debug("Task %s prompt: %s", self.__class__.__name__, prompt[:200])
