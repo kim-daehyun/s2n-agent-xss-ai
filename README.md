@@ -47,7 +47,7 @@ After:  URL/DOM/SiteMap/response → S2N-Agent reasoning → Plugin selection + 
 ### 요구사항 / Requirements
 
 - Python 3.10+
-- S2N `>= 0.3.2` (`pip install s2n`)
+- S2N `>= 1.0.0` (`pip install s2n`)
 - [Ollama](https://ollama.ai) (로컬 추론 / local inference)
 
 ### S2N-Agent 설치 / Install
@@ -189,8 +189,8 @@ python3 scripts/train.py --config configs/lora_7b.yaml
 # 중단 후 재개
 python3 scripts/train.py --config configs/lora_3b.yaml --resume
 
-# mlx-lm 직접 실행
-mlx_lm.lora --config configs/lora_3b.yaml
+# mlx-lm 직접 실행 (python -m mlx_lm.lora 는 deprecated)
+python3 -m mlx_lm lora --config configs/lora_3b.yaml
 ```
 
 **모델 권장 사양:**

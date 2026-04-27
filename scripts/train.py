@@ -83,8 +83,9 @@ def run_training(config_path: str, resume: bool = False) -> None:
     _verify_data(data_dir)
 
     # mlx-lm lora 명령 구성
+    # `python -m mlx_lm.lora` 는 deprecated → `python -m mlx_lm lora` 사용
     cmd = [
-        sys.executable, "-m", "mlx_lm.lora",
+        sys.executable, "-m", "mlx_lm", "lora",
         "--config", str(cfg_path),
     ]
     if resume:

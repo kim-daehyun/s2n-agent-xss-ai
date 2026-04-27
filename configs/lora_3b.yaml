@@ -4,7 +4,7 @@
 #   python3 scripts/train.py --config configs/lora_3b.yaml
 #
 # 직접 mlx-lm 실행:
-#   mlx_lm.lora --config configs/lora_3b.yaml
+#   python3 -m mlx_lm lora --config configs/lora_3b.yaml
 
 # ── 모델 ──────────────────────────────────────────────────────────────────────
 model: "mlx-community/Qwen2.5-Coder-3B-Instruct-4bit"
@@ -33,8 +33,12 @@ num_layers: 16          # 전체 레이어 중 학습에 참여할 레이어 수
 batch_size: 4
 grad_checkpoint: true  # 메모리 절약 (M1/M2/M3 8GB 대응)
 learning_rate: 1.0e-4
-lr_schedule: "cosine"   # cosine decay
-warmup_steps: 50
+# lr_schedule: mlx-lm은 문자열이 아닌 dict를 기대함.
+# cosine decay가 필요하면 아래 형식 사용:
+# lr_schedule:
+#   name: cosine_decay
+#   warmup: 50
+#   arguments: [1.0e-5, 1600]  # [min_lr, decay_steps]
 
 # 총 반복 횟수: 3200 samples / batch_size 4 ≈ 800 steps/epoch
 # 2 epoch 기준 → 1600 iters

@@ -2,6 +2,7 @@
 #
 # 실행:
 #   python3 scripts/train.py --config configs/lora_7b.yaml
+#   python3 -m mlx_lm lora --config configs/lora_7b.yaml
 #
 # 요구 메모리: ~14GB (4-bit 양자화 기준) — M1 16GB 이상 권장, M3 Pro/Max 최적
 
@@ -30,8 +31,12 @@ num_layers: 28          # 7B는 28~32층 — 절반 참여
 batch_size: 2           # 7B는 배치 줄여 메모리 확보
 grad_checkpoint: true
 learning_rate: 5.0e-5   # 7B는 더 낮은 LR 권장
-lr_schedule: "cosine"
-warmup_steps: 100
+# lr_schedule: mlx-lm은 문자열이 아닌 dict를 기대함.
+# cosine decay가 필요하면 아래 형식 사용:
+# lr_schedule:
+#   name: cosine_decay
+#   warmup: 100
+#   arguments: [5.0e-6, 3200]  # [min_lr, decay_steps]
 
 # 3200 / 2 = 1600 steps/epoch → 2 epoch = 3200 iters
 iters: 3200
