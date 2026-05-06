@@ -1,13 +1,15 @@
 # S2N-Agent 파인튜닝 모델 개발 계획서
 
-> **Claude Code 최적화 버전** — 파일 경로·라인 번호 기반으로 실제 코드베이스와 동기화됨.
-> 최종 검증: 2026-04-27
+> **기준 문서** — S2N-Agent 전체 모델 개발 방향과 S2N 통합 전략.
+> 최종 검증: 2026-05-06
+>
+> 주의: `s2n/s2nscanner/...` 경로는 외부 S2N 패키지의 참조 구조이며, 이 repo의 직접 구현 대상은 `s2nagent/...`입니다.
 
 ---
 
 ## 1. 프로젝트 개요
 
-S2N(v0.3.0)은 플러그인 기반 웹 취약점 스캐너입니다.
+S2N은 플러그인 기반 웹 취약점 스캐너입니다.
 
 ```
 Crawler → SiteMap 생성 → Plugin 실행 → ScanReport
@@ -26,12 +28,12 @@ Crawler → SiteMap 생성 → Plugin 실행 → ScanReport
 
 ```
 기존: URL/DOM → 조건 충족 → Plugin 실행
-목표: URL/DOM/SiteMap/응답 → S2N-Agent 추론 → Plugin 선택 + Payload 계획 → 결과 해석
+목표: URL/DOM/SiteMap/응답 → Router Agent → Plugin Agent → Plugin 실행 → 결과 해석
 ```
 
 ---
 
-## 2. 현재 플러그인 목록 (12개, 2026-04-27 기준)
+## 2. 현재 플러그인 목록 (12개, 2026-05-06 기준)
 
 ```
 s2n/s2nscanner/plugins/
@@ -78,9 +80,18 @@ ATT&CK 매핑 (mitre-attack-plugin-guide.md §2 참조):
 - 세션/쿠키 관리
 - DOM 파싱 직접 처리
 
+모델 운영 기준:
+
+- `RouterAgent`: 전체 SiteMap/DOM/응답을 보고 실행 후보 플러그인 top-k를 고른다.
+- `PluginAgent`: 각 플러그인별 전담 모델 또는 전담 프롬프트로 `should_run`, payload, 결과 해석을 판단한다.
+- `S2NAgentPlugin`: router와 plugin agent 결과를 `ScanContext.session_data["agent_state"]`와 `PluginResult.metadata["agent_decision"]`에 기록한다.
+- S2N core plugin: 실제 스캔, HTTP 요청, 세션/쿠키, 검증을 담당한다.
+
+플러그인별 모델 분리 방식은 `docs/plugin-plan.md`를 기준으로 한다. v1 권장안은 12개 풀 모델이 아니라 **공통 베이스 모델 + 플러그인별 LoRA/QLoRA 어댑터 + router**다.
+
 ---
 
-## 4. 실제 통합 포인트 (코드베이스 검증 완료)
+## 4. 통합 포인트 (외부 S2N 참조 구조)
 
 ### 4-1. `ScannerConfig`에 `ai_mode` 추가
 
@@ -114,7 +125,7 @@ post_scan(plugin_context)  → 결과 해석 + 다음 액션 계획
 cleanup(plugin_context)    → 정리
 ```
 
-`S2NAgentPlugin`은 `pre_scan`에서 SiteMap을 읽어 대상 플러그인 목록을 결정하고, `run`은 위임 실행, `post_scan`에서 결과를 해석해 다음 스캔 계획을 반환하는 구조로 설계.
+`S2NAgentPlugin`은 `pre_scan`에서 SiteMap을 읽어 router 후보와 플러그인별 agent 결정을 만들고, `run`은 assist 모드 권고를 출력하며, `post_scan`에서 결과를 해석해 다음 스캔 계획을 반환하는 구조로 설계한다.
 
 ### 4-3. `on_finding` 실시간 콜백 (이미 존재)
 
@@ -134,6 +145,7 @@ Scanner(
 ```python
 scan_context.session_data["agent_state"] = {
     "plan": [...],
+    "plugin_agent_decisions": [...],
     "completed_plugins": [...],
     "next_actions": [...],
 }
@@ -158,7 +170,13 @@ pages = sitemap.pages if sitemap else []
 PluginResult(
     ...,
     metadata={
-        "agent_decision": {"plugin": "xss", "confidence": 91},
+        "agent_decision": {
+            "agent": "xss_agent",
+            "plugin": "xss",
+            "model": "s2n-agent-xss",
+            "should_run": True,
+            "confidence": 91,
+        },
         "payloads_tried": 12,
         "reasoning": "input[name=q] detected — XSS likely",
     }
@@ -180,6 +198,28 @@ if run_all or not plugin_list:
 ---
 
 ## 5. 모델 학습 태스크 정의
+
+현재 `s2nagent/tasks/`와 `scripts/evaluate.py`가 기대하는 Task A-D 출력 JSON은 유지한다. 플러그인별 전담 agent의 공통 envelope는 모델의 원시 출력이 아니라 orchestration 계층에서 조합해 저장한다.
+
+공통 envelope 예:
+
+```json
+{
+  "agent": "xss_agent",
+  "plugin": "xss",
+  "model": "s2n-agent-xss",
+  "should_run": true,
+  "confidence": 91,
+  "reason": "reflected input in html_attribute context",
+  "task_outputs": {
+    "selection": {"plugin": "xss", "confidence": 91, "reason": "..."},
+    "payload_plan": {"payloads": ["<svg/onload=alert(1)>"], "strategy": "..."},
+    "false_positive": null,
+    "next_plan": null
+  },
+  "next_action": "run_plugin"
+}
+```
 
 ### Task A. Plugin Selection
 
@@ -228,7 +268,7 @@ if run_all or not plugin_list:
     "sitemap": "admin route /admin/panel discovered"
   },
   "output": {
-    "next_action": "run path_traversal",
+    "next_action": "path_traversal",
     "reason": "admin route suggests privileged file access possible"
   }
 }
@@ -238,27 +278,41 @@ if run_all or not plugin_list:
 
 ## 6. 데이터셋 구성
 
-| 유형                  | 수량      |
-| --------------------- | --------- |
-| XSS                   | 800       |
-| SQLi                  | 800       |
-| Upload / react2shell  | 400       |
-| Auth/JWT              | 500       |
-| IDOR / Path Traversal | 500       |
-| False Positive 사례   | 1000      |
-| **합계**              | **4000+** |
+최종 학습 파일은 현재 구현과 같은 ChatML JSONL을 유지한다.
+
+```json
+{
+  "messages": [
+    {"role": "system", "content": "plugin-specific system prompt"},
+    {"role": "user", "content": "task input JSON"},
+    {"role": "assistant", "content": "task output strict JSON"}
+  ]
+}
+```
+
+플러그인별 모델 학습을 위해 내부 원천 데이터에는 `plugin`, `agent`, `task`, `context`, `evidence`, `expected_json` 필드를 둔다.
+
+| 유형 | 대상 | 수량 목표 |
+| --- | --- | --- |
+| Router | 12개 플러그인 후보 선정 | 1,200 |
+| P0 adapters | XSS, SQLi, Upload, JWT | 플러그인당 600-1,000 |
+| P1 profiles/adapters | OS Command, Path Traversal, Sensitive Files, React2Shell | 플러그인당 300-600 |
+| P2 profiles | CSRF, Brute Force, Soft Brute Force, Autobot | 플러그인당 200-400 |
+| False Positive 사례 | plugin별 confirmed/FP 균형 | 1,200+ |
 
 데이터 소스: DVWA, Juice Shop, WebGoat, 직접 생성 샘플
 
 ---
 
-## 7. 권장 Base 모델
+## 7. 모델 운영 전략
 
-| 용도        | 모델             | 이유                                     |
-| ----------- | ---------------- | ---------------------------------------- |
-| 실전        | Qwen2.5-Coder 7B | HTML/JS/JSON 강함, Tool calling, M1 가능 |
-| 실험        | Qwen 3B          | 빠른 반복                                |
-| 보고서 보조 | Gemma 계열       | 자연어 출력 품질                         |
+| 용도 | 모델/방식 | 이유 |
+| --- | --- | --- |
+| Router | Qwen2.5-Coder 3B 또는 7B | 후보 top-k 선정은 빠른 응답이 중요 |
+| P0 Plugin Agent | Qwen2.5-Coder 7B + plugin LoRA/QLoRA | XSS/SQLi/Upload/JWT는 전문성 필요 |
+| P1 Plugin Agent | 공통 7B + prompt profile, 이후 adapter | 데이터 확보 후 분리 |
+| P2 Plugin Agent | 공통 7B + prompt profile | 초기 운영 비용 최소화 |
+| 보고서 보조 | Gemma 계열 등 별도 자연어 모델 | strict JSON 판단 모델과 분리 가능 |
 
 ---
 
@@ -269,6 +323,16 @@ if run_all or not plugin_list:
 - **운영**: 낮 = 개발/추론, 밤 = 파인튜닝
 
 권장 모델 크기: 3B (빠름), 7B (최적). 14B 이상 로컬 학습 비권장.
+
+v1 학습 순서:
+
+1. `s2n-agent-router`
+2. `s2n-agent-xss`
+3. `s2n-agent-sqli`
+4. `s2n-agent-upload`
+5. `s2n-agent-jwt`
+
+나머지 8개 플러그인은 v1에서 공통 모델 + plugin-specific system prompt로 운영하고, 평가 지표가 부족한 순서대로 adapter를 추가한다.
 
 ---
 
@@ -286,8 +350,12 @@ Select plugins, plan payloads, interpret results, plan next actions.
 ```
 
 ```bash
-ollama create s2n-agent -f Modelfile
+ollama create s2n-agent -f s2nagent/models/Modelfile
+ollama create s2n-agent-xss -f s2nagent/models/Modelfile.xss
+ollama create s2n-agent-sqli -f s2nagent/models/Modelfile.sqli
 ```
+
+`Modelfile.xss`, `Modelfile.sqli`처럼 플러그인별 Modelfile은 신규 생성 대상이다. 초기에는 공통 `s2nagent/models/Modelfile`을 복제한 뒤 adapter와 system prompt만 분리한다.
 
 ---
 
@@ -296,15 +364,19 @@ ollama create s2n-agent -f Modelfile
 ```
 Scanner.scan()
   ↓ smart_crawl() → scan_context.sitemap 자동 첨부
-  ↓ for plugin in discovered_plugins:
-      ↓ plugin.pre_scan(ctx)   ← AI: sitemap 분석, 실행 여부 결정
-      ↓ plugin.run(ctx)        ← 실제 스캔
-      ↓ plugin.post_scan(ctx)  ← AI: 결과 해석, 다음 액션 계획
-      ↓ plugin.cleanup(ctx)
+  ↓ S2NAgentPlugin.pre_scan(ctx)
+      ↓ RouterAgent: 후보 플러그인 top-k 선정
+      ↓ PluginAgent: 후보별 should_run + payload 계획
+      ↓ agent_state["plugin_agent_decisions"] 저장
+  ↓ selected S2N plugins run(ctx)  ← 실제 스캔
+  ↓ on_finding(finding)            ← 실시간 AI 피드백 가능
+  ↓ S2NAgentPlugin.post_scan(ctx)
+      ↓ FP 필터 + 다음 액션 계획
+      ↓ PluginResult.metadata["agent_decision"] 기록
   ↓ ScanReport 반환
 ```
 
-`on_finding` 콜백 (`scan_engine.py:71`) — Finding 단위 실시간 AI 피드백 가능.
+`assist` 모드에서는 실행 플러그인을 바꾸지 않고 권고만 남긴다. `smart` 모드부터 router와 `should_run` 결과를 사용해 실행 후보를 제한한다.
 
 ---
 
@@ -313,8 +385,8 @@ Scanner.scan()
 ```bash
 s2n scan -u https://target.com --ai-mode off        # 기본 (현재)
 s2n scan -u https://target.com --ai-mode assist     # AI 권고만 (실행은 기존)
-s2n scan -u https://target.com --ai-mode smart      # AI가 플러그인 선택
-s2n scan -u https://target.com --ai-mode aggressive # AI 멀티스텝 계획
+s2n scan -u https://target.com --ai-mode smart      # router + plugin agent가 실행 후보 선택
+s2n scan -u https://target.com --ai-mode aggressive # plugin agent 기반 멀티스텝 계획
 ```
 
 `--ai-mode` 옵션 추가 위치: `s2n/s2nscanner/cli/runner.py` scan 명령어 (`@click.option` 블록)
@@ -326,7 +398,10 @@ s2n scan -u https://target.com --ai-mode aggressive # AI 멀티스텝 계획
 | 항목                   | 목표 |
 | ---------------------- | ---- |
 | Plugin 선택 정확도     | 85%+ |
+| Router top-3 recall    | 95%+ |
+| Plugin should_run F1   | 85%+ |
 | False Positive 감소    | 30%+ |
+| JSON 파싱 성공률       | 95%+ |
 | 평균 탐색 시간 단축    | 20%+ |
 | Hidden Endpoint 탐지율 | 증가 |
 
@@ -334,12 +409,13 @@ s2n scan -u https://target.com --ai-mode aggressive # AI 멀티스텝 계획
 
 ## 13. 개발 일정
 
-| 주차   | 작업                                                                           |
-| ------ | ------------------------------------------------------------------------------ |
-| Week 1 | `ScannerConfig.ai_mode` 필드 추가 / 데이터 포맷 설계 / 학습 파이프라인 구축    |
-| Week 2 | 3B 모델 1차 학습 / `S2NAgentPlugin` 스켈레톤 구현 (pre_scan/post_scan 훅 활용) |
-| Week 3 | Payload planner 추가 / `on_finding` 실시간 피드백 연결                         |
-| Week 4 | Ollama 배포 / CLI `--ai-mode` 옵션 공개                                        |
+| 주차   | 작업 |
+| ------ | ---- |
+| Week 1 | `PluginAgentDecision` envelope / registry 설계 / Task A-D 호환성 유지 |
+| Week 2 | Router + P0 agent skeleton (`xss`, `sqlinjection`, `file_upload`, `jwt`) |
+| Week 3 | P0 adapter 학습 / plugin별 JSONL 생성 / `on_finding` 실시간 피드백 연결 |
+| Week 4 | Ollama 모델명 분리 / CLI `--ai-mode`, `--ai-model`, `--ai-endpoint` 공개 |
+| Week 5+ | P1/P2 플러그인 adapter 확장 및 benchmark |
 
 ---
 
@@ -350,28 +426,29 @@ s2n scan -u https://target.com --ai-mode aggressive # AI 멀티스텝 계획
 ```
 s2n/s2nscanner/interfaces.py:113 ScannerConfig에 ai_mode, ai_model, ai_endpoint 필드 추가.
 s2n/s2nscanner/scan_engine.py:71 Scanner.__init__에 ai_agent 파라미터 추가.
-pre_scan/post_scan 훅(scan_engine.py:466-512)을 통해 Ollama 호출 구조 설계해줘.
+pre_scan/post_scan 훅(scan_engine.py:466-512)을 통해 RouterAgent + PluginAgent registry 호출 구조 설계해줘.
 ```
 
 ### 데이터 생성
 
 ```
-XSS plugin selection 학습용 JSONL 500개 생성.
-입력: {url, dom, sitemap_summary}, 출력: {plugin, confidence}
+XSS 전담 agent 학습용 ChatML JSONL 500개 생성.
+원천 필드: {plugin, agent, task, context, evidence, expected_json}
+최종 출력: messages[{system,user,assistant}]
 interfaces.py:246 Finding 구조 참고.
 ```
 
 ### 코드 작성
 
 ```
-s2n/s2nscanner/interfaces.py:113 ScannerConfig에 ai_mode: str = "off" 필드 추가 PR 수준 코드 작성.
-s2n/s2nscanner/cli/runner.py scan 명령에 --ai-mode Click 옵션 추가.
+s2nagent/plugin_agents/registry.py에 12개 플러그인 agent registry 스켈레톤 추가.
+S2NAgentPlugin.pre_scan에서 router top-k와 PluginAgentDecision envelope를 agent_state에 저장.
 ```
 
 ### 평가
 
 ```
-Task C (False Positive Filter) 정확도 측정 benchmark 코드 작성.
+Router top-3 recall, Plugin should_run F1, Task C FP 감소율 benchmark 코드 작성.
 interfaces.py:246 Finding, interfaces.py:280 PluginResult 기반.
 ```
 
@@ -386,8 +463,8 @@ LLM이 스캐너를 지휘하면 성공한다.
 
 최종 권장 실행 순서:
 
-1. Mac mini M1 → Qwen 3B 실험
-2. Qwen 7B 실전 전환
-3. LoRA nightly tuning
-4. Ollama 배포
-5. S2N AI Mode 통합
+1. Router를 3B 또는 7B로 먼저 실험
+2. P0 플러그인 4개를 개별 adapter로 분리
+3. 공통 envelope와 registry를 S2NAgentPlugin에 통합
+4. Ollama에 `s2n-agent-*` 모델명으로 배포
+5. P1/P2 플러그인은 평가 지표에 따라 adapter로 승격
