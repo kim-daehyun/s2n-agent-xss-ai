@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import time
 from pathlib import Path
 from typing import Any
 
@@ -32,12 +33,13 @@ def write_json(data: dict[str, Any], path: Path) -> None:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 
-def load_raw_by_id(raw_path: Path) -> dict[str, dict[str, Any]]:
-    if not raw_path.exists():
-        return {}
+def format_seconds(seconds: float) -> str:
+    if seconds < 60:
+        return f"{seconds:.1f}s"
 
-    records = read_jsonl(raw_path)
-    return {record["id"]: record for record in records}
+    minutes = int(seconds // 60)
+    remaining = seconds % 60
+    return f"{minutes}m {remaining:.1f}s"
 
 
 def extract_user_payload(chatml_record: dict[str, Any]) -> dict[str, Any]:
@@ -53,6 +55,9 @@ def extract_user_payload(chatml_record: dict[str, Any]) -> dict[str, Any]:
 
 
 def get_expected_from_chatml(chatml_record: dict[str, Any]) -> dict[str, Any]:
+    """
+    build_xss_chatml.py에서 assistant message에 넣은 expected output을 읽는다.
+    """
     assistant_content = chatml_record["messages"][2]["content"]
     return json.loads(assistant_content)
 
@@ -152,34 +157,41 @@ def evaluate_record(agent: Any, record: dict[str, Any]) -> dict[str, Any]:
 
         if task == "payload_planning":
             actual = run_payload_planning(agent, payload)
+
             result["actual"] = actual
             result["checks"] = {
                 "schema_valid": is_payload_schema_valid(actual),
                 "has_payloads": bool(actual.get("payloads")),
                 "has_strategy": bool(actual.get("strategy")),
+                "has_context_notes": bool(actual.get("context_notes")),
             }
+
             result["passed"] = all(result["checks"].values())
             return result
 
         if task == "false_positive":
             actual = run_false_positive(agent, payload)
+
             result["actual"] = actual
             result["checks"] = {
                 "verdict": actual.get("verdict") == expected.get("verdict"),
                 "confidence_present": isinstance(actual.get("confidence"), int),
                 "reason_present": bool(actual.get("reason")),
             }
+
             result["passed"] = all(result["checks"].values())
             return result
 
         if task == "next_action":
             actual = run_next_action(agent, payload)
+
             result["actual"] = actual
             result["checks"] = {
                 "next_action": actual.get("next_action") == expected.get("next_action"),
                 "priority": actual.get("priority") == expected.get("priority"),
                 "reason_present": bool(actual.get("reason")),
             }
+
             result["passed"] = all(result["checks"].values())
             return result
 
@@ -192,6 +204,52 @@ def evaluate_record(agent: Any, record: dict[str, Any]) -> dict[str, Any]:
             "message": str(exc),
         }
         return result
+
+
+def evaluate_records_with_progress(
+    *,
+    agent: Any,
+    records: list[dict[str, Any]],
+    progress_every: int = 1,
+) -> list[dict[str, Any]]:
+    total = len(records)
+    results: list[dict[str, Any]] = []
+
+    if total == 0:
+        return results
+
+    started_at = time.time()
+
+    for idx, record in enumerate(records, start=1):
+        record_id = record.get("id", "unknown")
+        task = record.get("task", "unknown")
+
+        result = evaluate_record(agent, record)
+        results.append(result)
+
+        should_print = (
+            progress_every > 0
+            and (idx == 1 or idx == total or idx % progress_every == 0)
+        )
+
+        if should_print:
+            elapsed = time.time() - started_at
+            avg_per_item = elapsed / idx
+            remaining = avg_per_item * (total - idx)
+            percent = (idx / total) * 100
+            status = "PASS" if result.get("passed") else "FAIL"
+
+            print(
+                f"[{idx:04d}/{total:04d}] "
+                f"{percent:6.2f}% "
+                f"{status} "
+                f"task={task} "
+                f"id={record_id} "
+                f"elapsed={format_seconds(elapsed)} "
+                f"eta={format_seconds(remaining)}"
+            )
+
+    return results
 
 
 def summarize(results: list[dict[str, Any]]) -> dict[str, Any]:
@@ -231,6 +289,12 @@ def main() -> None:
     parser.add_argument("--test", default="data/plugin_agents/xss/test.jsonl")
     parser.add_argument("--out", default="reports/xss_agent/baseline_eval.json")
     parser.add_argument("--details-out", default="reports/xss_agent/baseline_eval_details.json")
+    parser.add_argument(
+        "--progress-every",
+        type=int,
+        default=1,
+        help="Print progress every N records. Use 0 to disable progress output.",
+    )
     args = parser.parse_args()
 
     agent = get_plugin_agent("xss")
@@ -238,7 +302,15 @@ def main() -> None:
         raise RuntimeError("xss agent not found in registry")
 
     records = read_jsonl(Path(args.test))
-    results = [evaluate_record(agent, record) for record in records]
+
+    print(f"loaded {len(records)} test records from {args.test}")
+    print("starting XSSAgent evaluation...")
+
+    results = evaluate_records_with_progress(
+        agent=agent,
+        records=records,
+        progress_every=args.progress_every,
+    )
 
     report = {
         "summary": summarize(results),
@@ -248,6 +320,9 @@ def main() -> None:
     write_json(report, Path(args.out))
     write_json({"results": results}, Path(args.details_out))
 
+    print("\n" + "=" * 80)
+    print("Evaluation summary")
+    print("=" * 80)
     print(json.dumps(report, ensure_ascii=False, indent=2))
     print(f"wrote summary to {args.out}")
     print(f"wrote details to {args.details_out}")

@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import random
+from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
@@ -85,6 +86,27 @@ def build_user_prompt(record: dict[str, Any]) -> str:
     raise ValueError(f"Unsupported task: {task}")
 
 
+def build_reason(record: dict[str, Any]) -> str:
+    task = record["task"]
+    expected = record["expected_json"]
+
+    if task == "selection":
+        if expected.get("should_run") is True:
+            context = expected.get("injection_context", "unknown")
+            parameter = expected.get("parameter", "unknown")
+            return f"User-controlled parameter '{parameter}' is reflected in {context} context"
+
+        return f"XSS should not run because this looks like {expected.get('reason_type', 'insufficient evidence')}"
+
+    if task == "next_action":
+        return f"Expected follow-up action is {expected.get('next_action')} based on completed plugins, findings, and sitemap"
+
+    if task == "false_positive":
+        return f"Expected verdict based on {expected.get('reason_type', 'provided evidence')}"
+
+    return "Expected output follows the provided evidence and task contract"
+
+
 def build_assistant_output(record: dict[str, Any]) -> str:
     task = record["task"]
     expected = record["expected_json"]
@@ -113,7 +135,7 @@ def build_assistant_output(record: dict[str, Any]) -> str:
     if task == "false_positive":
         output = {
             "verdict": expected["verdict"],
-            "reason": f"Expected verdict based on {expected.get('reason_type', 'provided evidence')}",
+            "reason": build_reason(record),
             "confidence": expected.get("confidence_min", 75),
         }
         return json.dumps(output, ensure_ascii=False)
@@ -129,46 +151,22 @@ def build_assistant_output(record: dict[str, Any]) -> str:
     raise ValueError(f"Unsupported task: {task}")
 
 
-def build_reason(record: dict[str, Any]) -> str:
-    task = record["task"]
-    expected = record["expected_json"]
-
-    if task == "selection":
-        if expected.get("should_run") is True:
-            context = expected.get("injection_context", "unknown")
-            parameter = expected.get("parameter", "unknown")
-            return f"User-controlled parameter '{parameter}' is reflected in {context} context"
-
-        return f"XSS should not run because this looks like {expected.get('reason_type', 'insufficient evidence')}"
-
-    if task == "next_action":
-        return f"Expected follow-up action is {expected.get('next_action')} based on completed plugins, findings, and sitemap"
-
-    return "Expected output follows the provided evidence and task contract"
-
-
 def to_chatml(record: dict[str, Any]) -> dict[str, Any]:
     return {
         "id": record["id"],
         "task": record["task"],
+        "plugin": record["plugin"],
+        "agent": record["agent"],
+        "expected_json": record["expected_json"],
         "messages": [
-            {
-                "role": "system",
-                "content": SYSTEM_PROMPT,
-            },
-            {
-                "role": "user",
-                "content": build_user_prompt(record),
-            },
-            {
-                "role": "assistant",
-                "content": build_assistant_output(record),
-            },
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": build_user_prompt(record)},
+            {"role": "assistant", "content": build_assistant_output(record)},
         ],
     }
 
 
-def split_records(
+def stratified_split_records(
     records: list[dict[str, Any]],
     *,
     train_ratio: float,
@@ -178,18 +176,40 @@ def split_records(
     if train_ratio <= 0 or valid_ratio < 0 or train_ratio + valid_ratio >= 1:
         raise ValueError("Invalid split ratios. Require train_ratio > 0, valid_ratio >= 0, train+valid < 1.")
 
-    shuffled = records[:]
-    random.Random(seed).shuffle(shuffled)
+    by_task: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for record in records:
+        by_task[record["task"]].append(record)
 
-    total = len(shuffled)
-    train_end = int(total * train_ratio)
-    valid_end = train_end + int(total * valid_ratio)
+    rng = random.Random(seed)
 
-    train = shuffled[:train_end]
-    valid = shuffled[train_end:valid_end]
-    test = shuffled[valid_end:]
+    train: list[dict[str, Any]] = []
+    valid: list[dict[str, Any]] = []
+    test: list[dict[str, Any]] = []
+
+    for task, task_records in sorted(by_task.items()):
+        shuffled = task_records[:]
+        rng.shuffle(shuffled)
+
+        total = len(shuffled)
+        train_end = int(total * train_ratio)
+        valid_end = train_end + int(total * valid_ratio)
+
+        train.extend(shuffled[:train_end])
+        valid.extend(shuffled[train_end:valid_end])
+        test.extend(shuffled[valid_end:])
+
+    rng.shuffle(train)
+    rng.shuffle(valid)
+    rng.shuffle(test)
 
     return train, valid, test
+
+
+def summarize(records: list[dict[str, Any]]) -> dict[str, int]:
+    summary: dict[str, int] = {}
+    for record in records:
+        summary[record["task"]] = summary.get(record["task"], 0) + 1
+    return summary
 
 
 def main() -> None:
@@ -204,7 +224,7 @@ def main() -> None:
     raw_records = read_jsonl(Path(args.input))
     chatml_records = [to_chatml(record) for record in raw_records]
 
-    train, valid, test = split_records(
+    train, valid, test = stratified_split_records(
         chatml_records,
         train_ratio=args.train_ratio,
         valid_ratio=args.valid_ratio,
@@ -220,6 +240,16 @@ def main() -> None:
     print(f"train records: {len(train)}")
     print(f"valid records: {len(valid)}")
     print(f"test records: {len(test)}")
+    print("split by task:")
+    print(json.dumps(
+        {
+            "train": summarize(train),
+            "valid": summarize(valid),
+            "test": summarize(test),
+        },
+        ensure_ascii=False,
+        indent=2,
+    ))
     print(f"wrote files to {out_dir}")
 
 
