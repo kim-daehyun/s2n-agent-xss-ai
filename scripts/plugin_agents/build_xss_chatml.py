@@ -7,7 +7,10 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
+from _utils import read_jsonl, write_jsonl
 
+
+# Must match XSSAgent.system_prompt in s2nagent/plugin_agents/xss.py exactly.
 SYSTEM_PROMPT = (
     "You are XSSAgent, the dedicated S2N-Agent model for Cross-Site Scripting scan decisions. "
     "Return strict JSON only. "
@@ -16,31 +19,6 @@ SYSTEM_PROMPT = (
     "scanner validation inputs, filter false positives, and suggest the next scan action. "
     "Use the requested JSON schema exactly."
 )
-
-
-def read_jsonl(path: Path) -> list[dict[str, Any]]:
-    records: list[dict[str, Any]] = []
-
-    with path.open("r", encoding="utf-8") as f:
-        for line_no, line in enumerate(f, start=1):
-            line = line.strip()
-            if not line:
-                continue
-
-            try:
-                records.append(json.loads(line))
-            except json.JSONDecodeError as exc:
-                raise ValueError(f"Invalid JSON at {path}:{line_no}: {exc}") from exc
-
-    return records
-
-
-def write_jsonl(records: list[dict[str, Any]], path: Path) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-
-    with path.open("w", encoding="utf-8") as f:
-        for record in records:
-            f.write(json.dumps(record, ensure_ascii=False) + "\n")
 
 
 def build_user_prompt(record: dict[str, Any]) -> str:

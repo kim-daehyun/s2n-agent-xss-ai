@@ -8,22 +8,7 @@ from typing import Any
 
 from s2nagent.plugin_agents.registry import get_plugin_agent
 
-
-def read_jsonl(path: Path) -> list[dict[str, Any]]:
-    records: list[dict[str, Any]] = []
-
-    with path.open("r", encoding="utf-8") as f:
-        for line_no, line in enumerate(f, start=1):
-            line = line.strip()
-            if not line:
-                continue
-
-            try:
-                records.append(json.loads(line))
-            except json.JSONDecodeError as exc:
-                raise ValueError(f"Invalid JSON at {path}:{line_no}: {exc}") from exc
-
-    return records
+from _utils import get_chatml_message, read_jsonl
 
 
 def write_json(data: dict[str, Any], path: Path) -> None:
@@ -43,7 +28,7 @@ def format_seconds(seconds: float) -> str:
 
 
 def extract_user_payload(chatml_record: dict[str, Any]) -> dict[str, Any]:
-    user_content = chatml_record["messages"][1]["content"]
+    user_content = get_chatml_message(chatml_record["messages"], "user")
 
     start = user_content.find("{")
     end = user_content.rfind("}")
@@ -58,7 +43,7 @@ def get_expected_from_chatml(chatml_record: dict[str, Any]) -> dict[str, Any]:
     """
     build_xss_chatml.py에서 assistant message에 넣은 expected output을 읽는다.
     """
-    assistant_content = chatml_record["messages"][2]["content"]
+    assistant_content = get_chatml_message(chatml_record["messages"], "assistant")
     return json.loads(assistant_content)
 
 
@@ -292,7 +277,7 @@ def main() -> None:
     parser.add_argument(
         "--progress-every",
         type=int,
-        default=1,
+        default=10,
         help="Print progress every N records. Use 0 to disable progress output.",
     )
     args = parser.parse_args()

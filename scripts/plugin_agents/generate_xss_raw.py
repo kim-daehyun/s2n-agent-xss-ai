@@ -2,19 +2,14 @@ from __future__ import annotations
 
 import argparse
 import json
+import random
 from pathlib import Path
 from typing import Any
 
+from _utils import write_jsonl
+
 
 DEFAULT_OUT = Path("data/plugin_agents/xss/raw.jsonl")
-
-DEFAULT_TASK_COUNTS = {
-    "selection": 300,
-    "payload_planning": 250,
-    "false_positive": 300,
-    "next_action": 150,
-}
-
 
 PARAMETERS = [
     "q",
@@ -62,11 +57,7 @@ def make_record(
     }
 
 
-def cycle_get(items: list[Any], idx: int) -> Any:
-    return items[idx % len(items)]
-
-
-def generate_selection_cases(count: int) -> list[dict[str, Any]]:
+def generate_selection_cases(count: int, rng: random.Random) -> list[dict[str, Any]]:
     records: list[dict[str, Any]] = []
 
     contexts = [
@@ -140,14 +131,17 @@ def generate_selection_cases(count: int) -> list[dict[str, Any]]:
         },
     ]
 
+    counts_per_context: dict[str, int] = {c: 0 for c in contexts}
+
     for idx in range(count):
-        context_type = cycle_get(contexts, idx)
-        param = cycle_get(PARAMETERS, idx)
-        endpoint = cycle_get(ENDPOINTS, idx)
-        sample_no = idx + 1
+        context_type = contexts[idx % len(contexts)]
+        param = rng.choice(PARAMETERS)
+        endpoint = rng.choice(ENDPOINTS)
+        counts_per_context[context_type] += 1
+        sample_no = counts_per_context[context_type]
 
         if context_type == "html_attribute":
-            dom = cycle_get(attribute_templates, idx).format(param=param)
+            dom = rng.choice(attribute_templates).format(param=param)
             url = f"{endpoint}?{param}=test"
             records.append(
                 make_record(
@@ -171,7 +165,7 @@ def generate_selection_cases(count: int) -> list[dict[str, Any]]:
             continue
 
         if context_type == "html_body":
-            dom = cycle_get(body_templates, idx)
+            dom = rng.choice(body_templates)
             url = f"{endpoint}?{param}=test"
             records.append(
                 make_record(
@@ -195,7 +189,7 @@ def generate_selection_cases(count: int) -> list[dict[str, Any]]:
             continue
 
         if context_type == "js_string":
-            dom = cycle_get(js_templates, idx).format(param=param)
+            dom = rng.choice(js_templates).format(param=param)
             url = f"{endpoint}?{param}=test"
             records.append(
                 make_record(
@@ -219,7 +213,7 @@ def generate_selection_cases(count: int) -> list[dict[str, Any]]:
             continue
 
         if context_type == "json_value":
-            response_snippet = cycle_get(json_templates, idx).format(param=param)
+            response_snippet = rng.choice(json_templates).format(param=param)
             url = f"/api{endpoint}?{param}=test"
             records.append(
                 make_record(
@@ -265,7 +259,7 @@ def generate_selection_cases(count: int) -> list[dict[str, Any]]:
             )
             continue
 
-        negative = cycle_get(negative_templates, idx)
+        negative = rng.choice(negative_templates)
         records.append(
             make_record(
                 sample_id=f"xss-selection-negative-{sample_no:04d}",
@@ -288,7 +282,7 @@ def generate_selection_cases(count: int) -> list[dict[str, Any]]:
     return records
 
 
-def generate_payload_cases(count: int) -> list[dict[str, Any]]:
+def generate_payload_cases(count: int, rng: random.Random) -> list[dict[str, Any]]:
     records: list[dict[str, Any]] = []
 
     payload_specs = [
@@ -337,14 +331,18 @@ def generate_payload_cases(count: int) -> list[dict[str, Any]]:
         },
     ]
 
+    counts_per_context: dict[str, int] = {}
+
     for idx in range(count):
-        spec = cycle_get(payload_specs, idx)
-        param = cycle_get(PARAMETERS, idx)
+        spec = payload_specs[idx % len(payload_specs)]
+        param = rng.choice(PARAMETERS)
         dom_snippet = spec["dom_template"].format(param=param) if spec["dom_template"] else ""
+        counts_per_context[spec["context"]] = counts_per_context.get(spec["context"], 0) + 1
+        sample_no = counts_per_context[spec["context"]]
 
         records.append(
             make_record(
-                sample_id=f"xss-payload-{spec['context']}-{idx + 1:04d}",
+                sample_id=f"xss-payload-{spec['context']}-{sample_no:04d}",
                 task="payload_planning",
                 context={
                     "plugin": "xss",
@@ -368,7 +366,7 @@ def generate_payload_cases(count: int) -> list[dict[str, Any]]:
     return records
 
 
-def generate_false_positive_cases(count: int) -> list[dict[str, Any]]:
+def generate_false_positive_cases(count: int, rng: random.Random) -> list[dict[str, Any]]:
     records: list[dict[str, Any]] = []
 
     fp_specs = [
@@ -444,12 +442,16 @@ def generate_false_positive_cases(count: int) -> list[dict[str, Any]]:
         },
     ]
 
+    counts_per_name: dict[str, int] = {}
+
     for idx in range(count):
-        spec = cycle_get(fp_specs, idx)
+        spec = fp_specs[idx % len(fp_specs)]
+        counts_per_name[spec["name"]] = counts_per_name.get(spec["name"], 0) + 1
+        sample_no = counts_per_name[spec["name"]]
 
         records.append(
             make_record(
-                sample_id=f"xss-fp-{spec['name']}-{idx + 1:04d}",
+                sample_id=f"xss-fp-{spec['name']}-{sample_no:04d}",
                 task="false_positive",
                 context={"finding": "Possible reflected XSS"},
                 evidence={
@@ -467,7 +469,7 @@ def generate_false_positive_cases(count: int) -> list[dict[str, Any]]:
     return records
 
 
-def generate_next_action_cases(count: int) -> list[dict[str, Any]]:
+def generate_next_action_cases(count: int, rng: random.Random) -> list[dict[str, Any]]:
     records: list[dict[str, Any]] = []
 
     next_specs = [
@@ -513,12 +515,16 @@ def generate_next_action_cases(count: int) -> list[dict[str, Any]]:
         },
     ]
 
+    counts_per_name: dict[str, int] = {}
+
     for idx in range(count):
-        spec = cycle_get(next_specs, idx)
+        spec = next_specs[idx % len(next_specs)]
+        counts_per_name[spec["name"]] = counts_per_name.get(spec["name"], 0) + 1
+        sample_no = counts_per_name[spec["name"]]
 
         records.append(
             make_record(
-                sample_id=f"xss-next-{spec['name']}-{idx + 1:04d}",
+                sample_id=f"xss-next-{spec['name']}-{sample_no:04d}",
                 task="next_action",
                 context={
                     "completed": spec["completed"],
@@ -538,7 +544,7 @@ def generate_next_action_cases(count: int) -> list[dict[str, Any]]:
 
 def resolve_counts(total: int | None) -> dict[str, int]:
     if total is None:
-        return DEFAULT_TASK_COUNTS.copy()
+        total = 1000
 
     if total <= 0:
         raise ValueError("--total must be positive")
@@ -560,14 +566,19 @@ def resolve_counts(total: int | None) -> dict[str, int]:
     return counts
 
 
-def generate_records(total: int | None = None, limit: int | None = None) -> list[dict[str, Any]]:
+def generate_records(
+    total: int | None = None,
+    limit: int | None = None,
+    seed: int = 42,
+) -> list[dict[str, Any]]:
     counts = resolve_counts(total)
+    rng = random.Random(seed)
 
     records: list[dict[str, Any]] = []
-    records.extend(generate_selection_cases(counts["selection"]))
-    records.extend(generate_payload_cases(counts["payload_planning"]))
-    records.extend(generate_false_positive_cases(counts["false_positive"]))
-    records.extend(generate_next_action_cases(counts["next_action"]))
+    records.extend(generate_selection_cases(counts["selection"], rng))
+    records.extend(generate_payload_cases(counts["payload_planning"], rng))
+    records.extend(generate_false_positive_cases(counts["false_positive"], rng))
+    records.extend(generate_next_action_cases(counts["next_action"], rng))
 
     if limit is not None:
         records = records[:limit]
@@ -575,22 +586,15 @@ def generate_records(total: int | None = None, limit: int | None = None) -> list
     return records
 
 
-def write_jsonl(records: list[dict[str, Any]], path: Path) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-
-    with path.open("w", encoding="utf-8") as f:
-        for record in records:
-            f.write(json.dumps(record, ensure_ascii=False) + "\n")
-
-
 def main() -> None:
     parser = argparse.ArgumentParser(description="Generate synthetic raw samples for XSSAgent evaluation.")
     parser.add_argument("--out", default=str(DEFAULT_OUT))
-    parser.add_argument("--total", type=int, default=1000)
+    parser.add_argument("--total", type=int, default=None, help="Total sample count (default: 1000)")
     parser.add_argument("--limit", type=int, default=None)
+    parser.add_argument("--seed", type=int, default=42)
     args = parser.parse_args()
 
-    records = generate_records(total=args.total, limit=args.limit)
+    records = generate_records(total=args.total, limit=args.limit, seed=args.seed)
     write_jsonl(records, Path(args.out))
 
     by_task: dict[str, int] = {}
