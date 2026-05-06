@@ -4,7 +4,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
-FPVerdict = Literal["confirmed", "likely_false_positive"]
+FPVerdict = Literal["confirmed", "likely_false_positive", "inconclusive"]
 Priority = Literal["high", "medium", "low"]
 
 
