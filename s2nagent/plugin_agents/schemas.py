@@ -1,13 +1,22 @@
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
+
+FPVerdict = Literal["confirmed", "likely_false_positive"]
+Priority = Literal["high", "medium", "low"]
 
 
 class PluginAgentDecision(BaseModel):
     """
     Common decision envelope for plugin-specific agents.
+
+    task_outputs holds per-task results keyed by task name:
+      - "selection"      -> SelectionOutput
+      - "payload_plan"   -> PayloadPlanOutput
+      - "false_positive" -> FalsePositiveOutput
+      - "next_action"    -> NextActionOutput
 
     This schema is designed to be reused by future agents such as:
     - XSSAgent
@@ -24,16 +33,16 @@ class PluginAgentDecision(BaseModel):
     confidence: int = Field(ge=0, le=100)
     reason: str
 
-    context: dict[str, Any]
-    task_outputs: dict[str, Any]
+    context: dict[str, Any] = Field(default_factory=dict)
+    task_outputs: dict[str, Any] = Field(default_factory=dict)
 
     next_action: str
-    metadata: dict[str, Any]
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 class SelectionOutput(BaseModel):
     plugin: str
-    should_run: Optional[bool] = None
+    should_run: bool
     confidence: int = Field(ge=0, le=100)
     reason: str
 
@@ -46,7 +55,7 @@ class PayloadPlanOutput(BaseModel):
 
 
 class FalsePositiveOutput(BaseModel):
-    verdict: str
+    verdict: FPVerdict
     reason: str
     confidence: int = Field(ge=0, le=100)
 
@@ -54,4 +63,4 @@ class FalsePositiveOutput(BaseModel):
 class NextActionOutput(BaseModel):
     next_action: str
     reason: str
-    priority: str
+    priority: Priority
