@@ -47,6 +47,53 @@ def get_expected_from_chatml(chatml_record: dict[str, Any]) -> dict[str, Any]:
     return json.loads(assistant_content)
 
 
+def apply_model_to_agent(agent: Any, model_name: str | None) -> None:
+    """
+    Registry에서 가져온 XSSAgent에 평가용 Ollama 모델명을 주입한다.
+
+    현재 evaluator는 get_plugin_agent("xss")로 agent를 가져오므로,
+    XSSAgent 생성자를 직접 호출하지 않는다.
+    따라서 agent 또는 agent.client 내부에 존재하는 모델명 속성을 찾아 덮어쓴다.
+
+    지원하는 예상 속성명:
+    - agent.model
+    - agent.model_name
+    - agent.ollama_model
+    - agent.client.model
+    - agent.client.model_name
+    - agent.client.ollama_model
+    """
+    if not model_name:
+        return
+
+    updated = False
+
+    candidate_attrs = (
+        "model",
+        "model_name",
+        "ollama_model",
+    )
+
+    for attr in candidate_attrs:
+        if hasattr(agent, attr):
+            setattr(agent, attr, model_name)
+            updated = True
+
+    client = getattr(agent, "client", None)
+    if client is not None:
+        for attr in candidate_attrs:
+            if hasattr(client, attr):
+                setattr(client, attr, model_name)
+                updated = True
+
+    if not updated:
+        raise RuntimeError(
+            "Could not apply --model to XSSAgent. "
+            "Check s2nagent/plugin_agents/xss.py and the Ollama client "
+            "for the actual model attribute name."
+        )
+
+
 def run_selection(agent: Any, payload: dict[str, Any]) -> dict[str, Any]:
     context = payload.get("context", {})
     evidence = payload.get("evidence", {})
@@ -280,15 +327,27 @@ def main() -> None:
         default=10,
         help="Print progress every N records. Use 0 to disable progress output.",
     )
+    parser.add_argument(
+        "--model",
+        default=None,
+        help=(
+            "Ollama model name to use for evaluation. "
+            "Example: s2n-agent-xss-8b-ft:latest"
+        ),
+    )
     args = parser.parse_args()
 
     agent = get_plugin_agent("xss")
     if agent is None:
         raise RuntimeError("xss agent not found in registry")
 
+    apply_model_to_agent(agent, args.model)
+
     records = read_jsonl(Path(args.test))
 
     print(f"loaded {len(records)} test records from {args.test}")
+    if args.model:
+        print(f"using model: {args.model}")
     print("starting XSSAgent evaluation...")
 
     results = evaluate_records_with_progress(

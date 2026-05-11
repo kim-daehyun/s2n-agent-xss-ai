@@ -1,0 +1,59 @@
+{
+  "summary": {
+    "total": 100,
+    "passed": 72,
+    "accuracy": 0.72,
+    "by_task": {
+      "false_positive": {
+        "total": 30,
+        "passed": 18,
+        "accuracy": 0.6
+      },
+      "next_action": {
+        "total": 15,
+        "passed": 4,
+        "accuracy": 0.26666666666666666
+      },
+      "selection": {
+        "total": 30,
+        "passed": 25,
+        "accuracy": 0.8333333333333334
+      },
+      "payload_planning": {
+        "total": 25,
+        "passed": 25,
+        "accuracy": 1.0
+      }
+    }
+  },
+  "failed_ids": [
+    "xss-fp-confirmed_img_onerror-0011",
+    "xss-selection-negative-0028",
+    "xss-next-xss_stop_low_signal-0025",
+    "xss-next-xss_to_jwt-0029",
+    "xss-selection-negative-0036",
+    "xss-next-xss_to_csrf-0012",
+    "xss-selection-negative-0007",
+    "xss-fp-attribute_reflection_only-0028",
+    "xss-fp-confirmed_img_onerror-0012",
+    "xss-next-xss_to_csrf-0016",
+    "xss-fp-confirmed_img_onerror-0008",
+    "xss-fp-attribute_reflection_only-0008",
+    "xss-next-xss_to_csrf-0017",
+    "xss-fp-confirmed_unescaped_svg-0030",
+    "xss-selection-negative-0006",
+    "xss-next-xss_to_jwt-0003",
+    "xss-fp-confirmed_img_onerror-0009",
+    "xss-next-xss_stop_low_signal-0008",
+    "xss-fp-attribute_reflection_only-0023",
+    "xss-fp-attribute_reflection_only-0012",
+    "xss-next-xss_stop_low_signal-0003",
+    "xss-next-xss_to_csrf-0028",
+    "xss-next-xss_to_csrf-0004",
+    "xss-fp-plain_reflection-0026",
+    "xss-selection-negative-0030",
+    "xss-fp-confirmed_unescaped_svg-0015",
+    "xss-next-xss_to_jwt-0025",
+    "xss-fp-confirmed_unescaped_svg-0012"
+  ]
+}

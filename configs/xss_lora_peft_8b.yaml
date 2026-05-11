@@ -1,0 +1,41 @@
+experiment:
+  name: xss-agent-8b-peft-lora
+  description: >
+    PEFT LoRA fine-tuning for XSSAgent using a Llama 3.1 8B Instruct base
+    compatible with the Ollama llama3.1:8b runtime target.
+
+model:
+  base_model: meta-llama/Meta-Llama-3.1-8B-Instruct
+
+data:
+  train_file: data/plugin_agents/xss_peft/train.jsonl
+  valid_file: data/plugin_agents/xss_peft/valid.jsonl
+  test_file: data/plugin_agents/xss_peft/test.jsonl
+
+output:
+  adapter_dir: adapters/xss-agent-8b-peft
+  train_log: reports/xss_agent/xss_lora_peft_train.log
+
+training:
+  max_length: 768
+  epochs: 1
+  batch_size: 1
+  grad_accum_steps: 8
+  learning_rate: 0.00002
+  warmup_steps: 10
+  eval_every: 50
+  save_every: 100
+  seed: 42
+
+lora:
+  r: 8
+  alpha: 16
+  dropout: 0.05
+  target_modules:
+    - q_proj
+    - k_proj
+    - v_proj
+    - o_proj
+    - gate_proj
+    - up_proj
+    - down_proj

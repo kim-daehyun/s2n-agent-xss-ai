@@ -1,0 +1,56 @@
+{
+  "seed": 20260508,
+  "total": 2400,
+  "train": 1800,
+  "valid": 300,
+  "test": 300,
+  "raw_distribution": {
+    "false_positive": 600,
+    "next_action": 600,
+    "payload_planning": 600,
+    "selection": 600
+  },
+  "train_distribution": {
+    "false_positive": 450,
+    "next_action": 450,
+    "payload_planning": 450,
+    "selection": 450
+  },
+  "valid_distribution": {
+    "false_positive": 75,
+    "next_action": 75,
+    "payload_planning": 75,
+    "selection": 75
+  },
+  "test_distribution": {
+    "false_positive": 75,
+    "next_action": 75,
+    "payload_planning": 75,
+    "selection": 75
+  },
+  "fixes": {
+    "json_value_double_braces": "removed by using render_tpl() with direct placeholder replacement only",
+    "expected_assistant_schema": "expected_json and assistant content are identical for every record",
+    "valid_test_overlap": "train/valid/test are generated with split-specific URLs, DOM snippets, sitemap wording, and response markers"
+  },
+  "policy": {
+    "selection": {
+      "positive": "should_run=true only when user-controlled input is reflected in DOM/response or JSON value with client-rendering risk",
+      "negative": "should_run=false for static assets, download/file upload surfaces, API no-reflection, and redirect without reflection"
+    },
+    "false_positive": {
+      "confirmed": "unescaped executable HTML or JavaScript string breakout is present in response_body",
+      "likely_false_positive": "not reflected, HTML escaped, or inert context",
+      "inconclusive": "reflected but not clearly executable"
+    },
+    "next_action": {
+      "stop_low": "completed all or low-signal only -> stop / low",
+      "csrf": "state-changing forms/admin/cookie session -> csrf / medium",
+      "jwt": "bearer token or JWT API route -> jwt / medium",
+      "xss": "XSS validation has not yet run for reflected candidate -> xss / medium"
+    },
+    "payload_planning": {
+      "rule": "payloads must match injection context, not only generic script tags"
+    }
+  }
+}
