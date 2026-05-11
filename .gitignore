@@ -97,3 +97,10 @@ __pycache__/
 !adapters/xss-agent-8b-peft-smoke/**
 !adapters/xss-agent-qwen3b-clean-peft/
 !adapters/xss-agent-qwen3b-clean-peft/**
+
+# local vector db / generated reports
+storage/chroma_xss_guides/
+reports/generated/
+__pycache__/
+*.pyc
+.DS_Store

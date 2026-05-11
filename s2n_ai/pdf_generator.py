@@ -1,0 +1,542 @@
+from pathlib import Path
+from typing import Any, Dict, List, Tuple
+from html import escape
+from datetime import datetime
+import re
+
+
+def _safe(value: Any, default: str = "-") -> str:
+    if value is None:
+        return default
+    if value == "":
+        return default
+    return str(value)
+
+
+def _split_contexts(
+    rag_contexts: List[Dict[str, Any]],
+) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+    internal_contexts: List[Dict[str, Any]] = []
+    external_references: List[Dict[str, Any]] = []
+
+    for ctx in rag_contexts:
+        source_type = ctx.get("source_type")
+        retriever = ctx.get("retriever")
+
+        if source_type == "external_official" or retriever == "official_catalog":
+            external_references.append(ctx)
+        else:
+            internal_contexts.append(ctx)
+
+    return internal_contexts, external_references
+
+
+def _clean_external_title(source: str, title: str) -> str:
+    source = _safe(source, "").strip()
+    title = _safe(title, "Official Reference").strip()
+
+    prefixes = [
+        "Official Source - ",
+        f"{source} - " if source else "",
+    ]
+
+    cleaned = title
+
+    for prefix in prefixes:
+        if prefix and cleaned.lower().startswith(prefix.lower()):
+            cleaned = cleaned[len(prefix):].strip()
+
+    if source and cleaned.lower().startswith(source.lower()):
+        cleaned = cleaned[len(source):].strip(" -:")
+
+    return cleaned or title
+
+
+def _strip_duplicate_urls_from_content(content: str) -> str:
+    if not content:
+        return ""
+
+    lines = []
+
+    for line in str(content).splitlines():
+        normalized = line.strip().lower()
+
+        if normalized.startswith("official url:"):
+            continue
+
+        if normalized.startswith("source url:"):
+            continue
+
+        lines.append(line)
+
+    cleaned = "\n".join(lines).strip()
+    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
+
+    return cleaned
+
+
+def _table(rows: List[Tuple[str, Any]]) -> str:
+    body = ""
+
+    for key, value in rows:
+        body += f"""
+        <tr>
+            <th>{escape(_safe(key))}</th>
+            <td>{escape(_safe(value))}</td>
+        </tr>
+        """
+
+    return f"""
+    <table>
+        <tbody>
+            {body}
+        </tbody>
+    </table>
+    """
+
+
+def _code_block(value: Any) -> str:
+    return f"<pre>{escape(_safe(value))}</pre>"
+
+
+def _numbered_table(items: List[str]) -> str:
+    body = ""
+
+    for idx, item in enumerate(items, start=1):
+        body += f"""
+        <tr>
+            <th>{idx}</th>
+            <td>{escape(_safe(item))}</td>
+        </tr>
+        """
+
+    return f"""
+    <table class="compact-table">
+        <tbody>
+            {body}
+        </tbody>
+    </table>
+    """
+
+
+def _render_internal_contexts(contexts: List[Dict[str, Any]]) -> str:
+    if not contexts:
+        return "<p>No internal ChromaDB context was retrieved.</p>"
+
+    html = ""
+
+    for idx, ctx in enumerate(contexts, start=1):
+        title = ctx.get("title") or "Internal Security Guide"
+        path = ctx.get("path") or "-"
+        score = ctx.get("score")
+        retriever = ctx.get("retriever") or "chroma"
+        content = ctx.get("content") or ""
+
+        meta_table = _table(
+            [
+                ("Source", path),
+                ("Retriever", retriever),
+                ("Vector Score", score),
+            ]
+        )
+
+        html += f"""
+        <div class="context-card internal">
+            <h3>6.{idx}. {escape(_safe(title))}</h3>
+            {meta_table}
+            {_code_block(content[:1200])}
+        </div>
+        """
+
+    return html
+
+
+def _render_external_references(references: List[Dict[str, Any]]) -> str:
+    if not references:
+        return "<p>No external official reference was matched.</p>"
+
+    html = ""
+
+    for idx, ref in enumerate(references, start=1):
+        source = ref.get("source") or "Official Source"
+        title = _clean_external_title(source, ref.get("title") or "Official Reference")
+        url = ref.get("url") or ref.get("path") or "-"
+        score = ref.get("score")
+        content = _strip_duplicate_urls_from_content(ref.get("content") or "")
+
+        meta_table = _table(
+            [
+                ("Source", source),
+                ("Reference Title", title),
+                ("Source URL", url),
+                ("Match Score", score),
+            ]
+        )
+
+        html += f"""
+        <div class="context-card external">
+            <h3>7.{idx}. {escape(_safe(source))} - {escape(_safe(title))}</h3>
+            {meta_table}
+            {_code_block(content[:1000])}
+        </div>
+        """
+
+    return html
+
+
+def generate_xss_pdf_report(
+    finding: Dict[str, Any],
+    rag_contexts: List[Dict[str, Any]],
+    pdf_path: str = "reports/generated/fastapi_xss_report.pdf",
+) -> str:
+    try:
+        from weasyprint import HTML
+    except ImportError as exc:
+        raise RuntimeError(
+            "weasyprint is required for PDF generation. Install it with: pip install weasyprint"
+        ) from exc
+
+    evidence = finding.get("evidence", {}) or {}
+    judgement = finding.get("agent_judgement", {}) or {}
+
+    internal_contexts, external_references = _split_contexts(rag_contexts)
+
+    generated_at = datetime.utcnow().isoformat() + "Z"
+
+    executive_summary_table = _table(
+        [
+            ("Vulnerability Type", finding.get("vuln_type", "XSS")),
+            ("Severity", finding.get("severity", "medium")),
+            ("Target URL", finding.get("url")),
+            ("HTTP Method", finding.get("method")),
+            ("Parameter", finding.get("parameter")),
+            ("Confidence", judgement.get("confidence")),
+            ("Next Action", finding.get("next_action")),
+        ]
+    )
+
+    finding_detail_table = _table(
+        [
+            ("Finding ID", finding.get("finding_id")),
+            ("Vulnerability Type", finding.get("vuln_type", "XSS")),
+            ("Target URL", finding.get("url")),
+            ("HTTP Method", finding.get("method")),
+            ("Affected Parameter", finding.get("parameter")),
+            ("Payload", finding.get("payload")),
+            ("Severity", finding.get("severity")),
+        ]
+    )
+
+    evidence_table = _table(
+        [
+            ("Payload", finding.get("payload")),
+            ("Reflection Detected", evidence.get("reflection")),
+            ("Reflected Value", evidence.get("reflected_value")),
+        ]
+    )
+
+    judgement_table = _table(
+        [
+            ("Task", judgement.get("task")),
+            ("Should Run", judgement.get("should_run")),
+            ("Context Known", judgement.get("context_known")),
+            ("Confidence", judgement.get("confidence")),
+            ("Fallback", judgement.get("fallback")),
+            ("Reason", judgement.get("reason")),
+        ]
+    )
+
+    risk_table = _table(
+        [
+            (
+                "Primary Risk",
+                "User-controlled input is reflected into an HTML response without clear output encoding.",
+            ),
+            (
+                "Impact",
+                "The browser may interpret reflected input as executable HTML or JavaScript.",
+            ),
+            (
+                "Primary Fix",
+                "Apply context-aware output encoding before rendering user-controlled data.",
+            ),
+            (
+                "Defense-in-depth",
+                "Apply Content Security Policy and avoid unsafe DOM APIs.",
+            ),
+        ]
+    )
+
+    remediation_controls = [
+        "Encode user-controlled output according to the rendering context.",
+        "Escape HTML body and HTML attribute values.",
+        "Avoid direct insertion into JavaScript execution contexts.",
+        "Prefer safe DOM APIs such as textContent instead of innerHTML.",
+        "Validate and normalize input on the server side.",
+        "Apply Content Security Policy as defense-in-depth.",
+    ]
+
+    remediation_controls_table = _numbered_table(remediation_controls)
+
+    retest_payload_2 = '"><img src=x onerror=alert(1)>'
+
+    retest_table = _table(
+        [
+            (
+                "Retest Goal",
+                "Verify that the reflected value is safely encoded or not executed in the browser context.",
+            ),
+            ("Payload 1", "<script>alert(1)</script>"),
+            ("Payload 2", retest_payload_2),
+            (
+                "Expected Result",
+                "Payload is rendered as text, HTML special characters are encoded, and no JavaScript execution occurs.",
+            ),
+        ]
+    )
+
+    retest_steps = [
+        "Submit a harmless validation payload to the affected parameter.",
+        "Verify that the reflected value is safely encoded in the HTTP response.",
+        "Open the response in a browser and confirm that no JavaScript execution occurs.",
+        "Confirm that HTML special characters are rendered as text, not interpreted as markup.",
+    ]
+
+    retest_steps_table = _numbered_table(retest_steps)
+
+    response_snippet_block = _code_block(evidence.get("response_snippet"))
+
+    internal_html = _render_internal_contexts(internal_contexts)
+    external_html = _render_external_references(external_references)
+
+    html = f"""
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>XSSAgent Security Report</title>
+<style>
+    @page {{
+        size: A4;
+        margin: 22mm 18mm;
+    }}
+
+    body {{
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+        color: #111827;
+        font-size: 13px;
+        line-height: 1.55;
+    }}
+
+    h1 {{
+        font-size: 30px;
+        margin: 0 0 8px 0;
+        letter-spacing: -0.5px;
+    }}
+
+    h2 {{
+        font-size: 20px;
+        margin-top: 30px;
+        padding-bottom: 6px;
+        border-bottom: 2px solid #1f2937;
+        page-break-after: avoid;
+    }}
+
+    h3 {{
+        font-size: 15px;
+        margin-top: 18px;
+        margin-bottom: 10px;
+        page-break-after: avoid;
+    }}
+
+    .generated {{
+        color: #6b7280;
+        margin-bottom: 28px;
+    }}
+
+    table {{
+        width: 100%;
+        border-collapse: collapse;
+        margin: 10px 0 14px 0;
+        table-layout: fixed;
+        page-break-inside: avoid;
+    }}
+
+    th {{
+        width: 26%;
+        background: #e5e7eb;
+        color: #111827;
+        text-align: left;
+        font-weight: 700;
+        padding: 9px 10px;
+        border: 1px solid #d1d5db;
+        vertical-align: top;
+    }}
+
+    td {{
+        padding: 9px 10px;
+        border: 1px solid #d1d5db;
+        vertical-align: top;
+        word-break: break-word;
+    }}
+
+    .compact-table th {{
+        width: 8%;
+        text-align: center;
+    }}
+
+    .compact-table td {{
+        width: 92%;
+    }}
+
+    pre {{
+        background: #f3f4f6;
+        border: 1px solid #d1d5db;
+        border-radius: 6px;
+        padding: 10px 12px;
+        white-space: pre-wrap;
+        word-break: break-word;
+        font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+        font-size: 11px;
+        line-height: 1.45;
+        page-break-inside: avoid;
+    }}
+
+    .context-card {{
+        margin-bottom: 18px;
+        padding: 12px 14px;
+        border-radius: 8px;
+        page-break-inside: avoid;
+    }}
+
+    .internal {{
+        border-left: 4px solid #2563eb;
+        background: #f8fafc;
+    }}
+
+    .external {{
+        border-left: 4px solid #059669;
+        background: #f9fafb;
+    }}
+
+    .note {{
+        background: #fffbeb;
+        border-left: 4px solid #f59e0b;
+        padding: 10px 12px;
+        margin: 12px 0;
+        page-break-inside: avoid;
+    }}
+
+    code {{
+        background: #f3f4f6;
+        border: 1px solid #e5e7eb;
+        border-radius: 4px;
+        padding: 1px 4px;
+        font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+        font-size: 11px;
+    }}
+</style>
+</head>
+<body>
+
+<h1>XSSAgent Security Report</h1>
+<div class="generated">Generated at: {escape(generated_at)}</div>
+
+<h2>1. Executive Summary</h2>
+{executive_summary_table}
+
+<h2>2. Finding Detail</h2>
+{finding_detail_table}
+
+<h2>3. Evidence</h2>
+{evidence_table}
+
+<h3>Response Snippet</h3>
+{response_snippet_block}
+
+<h2>4. XSSAgent Judgement</h2>
+{judgement_table}
+
+<h2>5. Risk & Remediation</h2>
+{risk_table}
+
+<h3>Recommended Controls</h3>
+{remediation_controls_table}
+
+<h2>6. Internal Knowledge Retrieved by ChromaDB</h2>
+<div class="note">
+This section contains internal security guidance retrieved from local Markdown documents indexed in ChromaDB.
+</div>
+{internal_html}
+
+<h2>7. External Official References</h2>
+<div class="note">
+This section contains catalog-based official reference matches from OWASP, CWE, MDN, and PortSwigger.
+</div>
+{external_html}
+
+<h2>8. Retest Recommendation</h2>
+{retest_table}
+
+<h3>Retest Steps</h3>
+{retest_steps_table}
+
+</body>
+</html>
+"""
+
+    output = Path(pdf_path)
+    output.parent.mkdir(parents=True, exist_ok=True)
+
+    HTML(string=html, base_url=".").write_pdf(str(output))
+
+    return str(output)
+
+
+if __name__ == "__main__":
+    sample_finding = {
+        "finding_id": "xss-demo",
+        "vuln_type": "XSS",
+        "url": "http://127.0.0.1:5000/search?q=test",
+        "method": "GET",
+        "parameter": "q",
+        "payload": "<script>alert(1)</script>",
+        "severity": "medium",
+        "next_action": "generate_report",
+        "evidence": {
+            "reflection": True,
+            "reflected_value": "<script>alert(1)</script>",
+            "response_snippet": "<p>You searched for: <script>alert(1)</script></p>",
+        },
+        "agent_judgement": {
+            "task": "selection",
+            "should_run": True,
+            "context_known": True,
+            "confidence": 1.0,
+            "fallback": False,
+            "reason": "xss-train decision: selection = xss-train",
+        },
+    }
+
+    sample_contexts = [
+        {
+            "source_type": "internal_vector",
+            "retriever": "chroma",
+            "title": "XSS Remediation Guide",
+            "path": "docs/security_guides/xss_remediation.md",
+            "score": 0.9739,
+            "content": "Reflected XSS occurs when user-controlled input is included in an HTTP response without proper output encoding.",
+        },
+        {
+            "source_type": "external_official",
+            "retriever": "official_catalog",
+            "source": "OWASP",
+            "title": "OWASP XSS Prevention Cheat Sheet",
+            "url": "https://cheatsheetseries.owasp.org/cheatsheets/Cross_Site_Scripting_Prevention_Cheat_Sheet.html",
+            "score": 21.0,
+            "content": "OWASP recommends context-aware output encoding for XSS prevention.\n\nOfficial URL: https://example.com\nSource URL: https://example.com",
+        },
+    ]
+
+    output_path = generate_xss_pdf_report(sample_finding, sample_contexts)
+    print(f"saved: {output_path}")
