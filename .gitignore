@@ -72,3 +72,28 @@ _trash_*/
 trash/
 backup/
 external/
+
+# Exclude full base models and deployment artifacts
+models/hf/
+models/ollama-adapter/
+models/**/*.gguf
+models/**/model-*.safetensors
+models/**/*.bin
+models/**/*.pt
+models/**/*.pth
+
+# Exclude local trash and env
+_trash*/
+.venv/
+venv/
+__pycache__/
+*.log
+
+# Allow fine-tuned PEFT adapters to be committed
+!adapters/
+!adapters/xss-agent-8b-peft/
+!adapters/xss-agent-8b-peft/**
+!adapters/xss-agent-8b-peft-smoke/
+!adapters/xss-agent-8b-peft-smoke/**
+!adapters/xss-agent-qwen3b-clean-peft/
+!adapters/xss-agent-qwen3b-clean-peft/**

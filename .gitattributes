@@ -1,0 +1,4 @@
+adapters/**/*.safetensors filter=lfs diff=lfs merge=lfs -text
+adapters/**/*.bin filter=lfs diff=lfs merge=lfs -text
+adapters/**/*.pt filter=lfs diff=lfs merge=lfs -text
+adapters/**/*.pth filter=lfs diff=lfs merge=lfs -text
