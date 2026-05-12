@@ -6,8 +6,6 @@ from html import escape
 from datetime import datetime
 from urllib.parse import urlparse, parse_qs
 import re
-from s2n_ai.pdf_vertical_summary_patch import install_vertical_summary_patch
-install_vertical_summary_patch(globals())
 
 
 
@@ -598,30 +596,39 @@ def _finding_summary_table(findings: List[Dict[str, Any]]) -> str:
     if not findings:
         return "<p>No finding summary available.</p>"
 
-    sections = []
-    for idx, f in enumerate(findings, start=1):
+    rows = []
+    for f in findings:
         evidence = f.get("evidence") or ""
         reflected = _evidence_get(evidence, "reflection", f.get("reflected", "-"))
         verification = _evidence_get(evidence, "verification", f.get("verification", "-"))
         url = f.get("url") or f.get("target_url") or "-"
+        payload = _short_payload(f.get("payload") or "-")
+        rows.append(
+            "<tr>"
+            f"<td>{_html(f.get('id') or f.get('finding_id') or '-')}</td>"
+            f"<td>{_html(f.get('severity') or '-')}</td>"
+            f"<td>{_html(f.get('confidence') or '-')}</td>"
+            f"<td>{_html(_compact_url(url))}</td>"
+            f"<td>{_html(f.get('parameter') or '-')}</td>"
+            f'<td class="payload-cell">{_code_inline(payload)}</td>'
+            f"<td>{_html(verification)}</td>"
+            f"<td>{_html(reflected)}</td>"
+            "</tr>"
+        )
 
-        sections.append(f"""
-        <section class="finding-summary-item">
-          <h3>2.{idx} Finding {idx}</h3>
-          {_table([
-              ("ID", f.get("id") or f.get("finding_id") or "-"),
-              ("Severity", f.get("severity") or "-"),
-              ("Confidence", f.get("confidence") or "-"),
-              ("Target Path", _compact_url(url)),
-              ("Parameter", f.get("parameter") or "-"),
-              ("Payload", f.get("payload") or "-"),
-              ("Verification", verification),
-              ("Reflected", reflected),
-          ])}
-        </section>
-        """)
-
-    return '<div class="finding-summary-vertical">' + "\n".join(sections) + "</div>"
+    return """
+    <table class="finding-summary">
+      <thead>
+        <tr>
+          <th>ID</th><th>Severity</th><th>Confidence</th><th>Target Path</th>
+          <th>Param</th><th>Payload</th><th>Verification</th><th>Reflected</th>
+        </tr>
+      </thead>
+      <tbody>
+    """ + "\n".join(rows) + """
+      </tbody>
+    </table>
+    """
 
 
 def _css() -> str:
@@ -729,33 +736,63 @@ def _css() -> str:
       overflow-wrap: anywhere;
     }
 
-    .finding-summary-vertical {
+    table.finding-summary {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+      font-size: 7.7pt;
       margin: 7pt 0 10pt 0;
     }
 
-    .finding-summary-item {
-      margin: 0 0 12pt 0;
-      break-inside: avoid;
-      page-break-inside: avoid;
+    table.finding-summary th {
+      background: #e5e7eb;
+      border: 1px solid #d1d5db;
+      padding: 4.5pt;
+      text-align: left;
     }
 
-    .finding-summary-item h3 {
-      font-size: 11pt;
-      margin: 0 0 6pt 0;
-    }
-
-    .finding-summary-item table.kv {
-      margin-top: 0;
-      font-size: 8.6pt;
-    }
-
-    .finding-summary-item table.kv th {
-      width: 24%;
-    }
-
-    .finding-summary-item table.kv td {
+    table.finding-summary td {
+      border: 1px solid #d1d5db;
+      padding: 4.5pt;
+      vertical-align: top;
       word-break: break-word;
       overflow-wrap: anywhere;
+    }
+
+    table.finding-summary th:nth-child(1),
+    table.finding-summary td:nth-child(1) {
+      width: 8%;
+    }
+
+    table.finding-summary th:nth-child(2),
+    table.finding-summary td:nth-child(2),
+    table.finding-summary th:nth-child(3),
+    table.finding-summary td:nth-child(3),
+    table.finding-summary th:nth-child(5),
+    table.finding-summary td:nth-child(5),
+    table.finding-summary th:nth-child(8),
+    table.finding-summary td:nth-child(8) {
+      width: 9%;
+    }
+
+    table.finding-summary th:nth-child(4),
+    table.finding-summary td:nth-child(4) {
+      width: 18%;
+    }
+
+    table.finding-summary th:nth-child(6),
+    table.finding-summary td:nth-child(6) {
+      width: 22%;
+    }
+
+    table.finding-summary th:nth-child(7),
+    table.finding-summary td:nth-child(7) {
+      width: 16%;
+    }
+
+    .payload-cell {
+      font-size: 7.2pt;
+      white-space: normal;
     }
 
     .inline-code {
@@ -1008,4 +1045,210 @@ def generate_xss_pdf_report(
 generate_pdf_report = generate_xss_pdf_report
 generate_pdf = generate_xss_pdf_report
 
+
+# --- S2N PDF vertical finding summary patch v2 ---
+# This patch intentionally replaces the fragile wide All Findings Summary table
+# with a vertical key-value card. It is generic enough for Juice Shop, DVWA,
+# and a custom local XSS test page.
+try:
+    from reportlab.lib import colors as _s2n_colors
+    from reportlab.lib.styles import ParagraphStyle as _S2NParagraphStyle
+    from reportlab.platypus import Table as _S2NBaseTable
+    from reportlab.platypus import TableStyle as _S2NTableStyle
+    from reportlab.platypus import Paragraph as _S2NParagraph
+    from xml.sax.saxutils import escape as _s2n_xml_escape
+
+    if "_S2N_ORIGINAL_TABLE_V2" not in globals():
+        _S2N_ORIGINAL_TABLE_V2 = Table
+
+    def _s2n_plain(value):
+        if value is None:
+            return "-"
+        try:
+            if hasattr(value, "getPlainText"):
+                return str(value.getPlainText())
+        except Exception:
+            pass
+        try:
+            if hasattr(value, "text"):
+                return str(value.text)
+        except Exception:
+            pass
+        return str(value)
+
+    def _s2n_wrapped_text(value, chunk=18):
+        text = _s2n_xml_escape(_s2n_plain(value))
+        text = text.replace("\n", "
+").replace("", "")
+        text = text.replace("
+", "<br/>")
+
+        # Break at code/URL separators. ReportLab has weak automatic wrapping for
+        # payloads such as <iframe src="javascript:alert(`xss`)">, so we create
+        # explicit break opportunities.
+        separators = [
+            "&amp;", "&lt;", "&gt;", "%", "?", "=", "/", ".", "_", "-", ":",
+            ";", "(", ")", "[", "]", "{", "}", ",", "'", "`", """,
+        ]
+        for sep in separators:
+            text = text.replace(sep, sep + "<br/>")
+
+        fixed = []
+        for part in text.split("<br/>"):
+            if len(part) > chunk:
+                fixed.extend(part[i:i + chunk] for i in range(0, len(part), chunk))
+            else:
+                fixed.append(part)
+        return "<br/>".join(fixed)
+
+    def _s2n_para(value, *, bold=False, code=False, size=None):
+        font = "Courier" if code else ("Helvetica-Bold" if bold else "Helvetica")
+        if size is None:
+            size = 6.8 if code else 7.2
+        leading = size + 1.8
+        return _S2NParagraph(
+            _s2n_wrapped_text(value),
+            _S2NParagraphStyle(
+                name="S2NVerticalCellV2",
+                fontName=font,
+                fontSize=size,
+                leading=leading,
+                wordWrap="CJK",
+                splitLongWords=True,
+                spaceBefore=0,
+                spaceAfter=0,
+            ),
+        )
+
+    def _s2n_headers(data):
+        try:
+            return [_s2n_plain(c).strip().lower() for c in data[0]]
+        except Exception:
+            return []
+
+    def _s2n_is_findings_summary(data):
+        headers = set(_s2n_headers(data))
+        return {"id", "severity", "confidence", "param", "payload", "verification"}.issubset(headers)
+
+    def _s2n_row_dict(headers, row):
+        values = [_s2n_plain(c) for c in row]
+        return {h: values[i] if i < len(values) else "-" for i, h in enumerate(headers)}
+
+    def _s2n_yes_no(value):
+        raw = _s2n_plain(value).strip().lower()
+        if raw in ("true", "1", "yes", "y"):
+            return "Yes"
+        if raw in ("false", "0", "no", "n"):
+            return "No"
+        return _s2n_plain(value)
+
+    def _s2n_human_verification(value):
+        raw = _s2n_plain(value)
+        low = raw.lower()
+        if "browser_dialog" in low or "dialog" in low:
+            return "Browser alert/dialog observed"
+        if "payload_reflected" in low:
+            return "Payload reflected in HTTP response"
+        if "direct_url_payload" in low:
+            return "Payload reflected in direct URL response"
+        if low.strip() == "reflected":
+            return "Payload reflected"
+        return raw or "-"
+
+    def _s2n_browser_confirmed(payload, verification, row_map):
+        joined = " ".join([
+            _s2n_plain(payload),
+            _s2n_plain(verification),
+            _s2n_plain(row_map.get("xss type", "")),
+            _s2n_plain(row_map.get("detection type", "")),
+            _s2n_plain(row_map.get("discovery mode", "")),
+        ]).lower()
+        return (
+            "browser_dialog" in joined
+            or "browser" in joined
+            or "dom" in joined
+            or "javascript:alert" in joined
+            or "<iframe" in joined
+        )
+
+    def _s2n_vertical_finding_table(data):
+        headers = _s2n_headers(data)
+        rows = []
+        title_rows = []
+
+        for idx, row in enumerate(data[1:], start=1):
+            item = _s2n_row_dict(headers, row)
+            payload = item.get("payload", "-")
+            verification = item.get("verification", "-")
+            reflected = item.get("reflected", "-")
+
+            browser_yes = _s2n_browser_confirmed(payload, verification, item)
+            detection_type = "DOM/browser-executed XSS" if browser_yes else "Reflected XSS"
+            browser_confirmed = "Yes" if browser_yes else "Not confirmed by browser probe"
+            server_reflected = _s2n_yes_no(reflected)
+
+            if browser_yes:
+                interpretation = (
+                    "Browser execution evidence was observed. Server Reflected=No can still be valid "
+                    "for DOM XSS because the vulnerable behavior is confirmed inside the browser/DOM."
+                )
+            else:
+                interpretation = "The payload was confirmed through HTTP reflection evidence."
+
+            title_rows.append(len(rows))
+            rows.append([_s2n_para(f"Finding #{idx}", bold=True, size=8.4), _s2n_para("", size=8.4)])
+
+            pairs = [
+                ("ID", item.get("id", "-"), False),
+                ("Severity", item.get("severity", "-"), False),
+                ("Confidence", item.get("confidence", "-"), False),
+                ("Detection Type", detection_type, False),
+                ("Target Path", item.get("target path", item.get("path", "-")), True),
+                ("Parameter", item.get("param", item.get("parameter", "-")), False),
+                ("Payload", payload, True),
+                ("Verification", _s2n_human_verification(verification), False),
+                ("Browser Execution Confirmed", browser_confirmed, False),
+                ("Server Reflected", server_reflected, False),
+                ("Interpretation", interpretation, False),
+            ]
+
+            for label, value, is_code in pairs:
+                rows.append([_s2n_para(label, bold=True), _s2n_para(value, code=is_code)])
+
+        tbl = _S2N_ORIGINAL_TABLE_V2(rows, colWidths=[135, 360], hAlign="LEFT", repeatRows=0)
+
+        style_cmds = [
+            ("GRID", (0, 0), (-1, -1), 0.35, _s2n_colors.HexColor("#C9CED6")),
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 6),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+            ("TOPPADDING", (0, 0), (-1, -1), 5),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+            ("BACKGROUND", (0, 0), (0, -1), _s2n_colors.HexColor("#EEF1F5")),
+        ]
+
+        for r in title_rows:
+            style_cmds.append(("SPAN", (0, r), (1, r)))
+            style_cmds.append(("BACKGROUND", (0, r), (1, r), _s2n_colors.HexColor("#DDE3EA")))
+
+        tbl.setStyle(_S2NTableStyle(style_cmds))
+        return tbl
+
+    def Table(data, *args, **kwargs):  # noqa: N802
+        try:
+            if _s2n_is_findings_summary(data):
+                return _s2n_vertical_finding_table(data)
+        except Exception as exc:
+            try:
+                print(f"[WARN] vertical finding summary fallback: {exc}")
+            except Exception:
+                pass
+        return _S2N_ORIGINAL_TABLE_V2(data, *args, **kwargs)
+
+except Exception as _s2n_pdf_patch_exc:
+    try:
+        print(f"[WARN] S2N PDF vertical patch not loaded: {_s2n_pdf_patch_exc}")
+    except Exception:
+        pass
+# --- end S2N PDF vertical finding summary patch v2 ---
 

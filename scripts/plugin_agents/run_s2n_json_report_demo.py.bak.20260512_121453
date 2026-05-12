@@ -1,0 +1,178 @@
+from __future__ import annotations
+
+import inspect
+import json
+from pathlib import Path
+from typing import Any
+
+
+INPUT_JSON = Path("reports/generated/dvwa_s2n_xss_direct_result.json")
+NORMALIZED_JSON = Path("reports/generated/dvwa_s2n_xss_normalized.json")
+MARKDOWN_OUT = Path("reports/generated/dvwa_s2n_xss_report.md")
+PDF_OUT = Path("reports/generated/dvwa_s2n_xss_report.pdf")
+
+
+def load_first_s2n_finding(path: Path) -> dict[str, Any]:
+    data = json.loads(path.read_text(encoding="utf-8"))
+
+    plugin_results = data.get("plugin_results") or []
+    if not plugin_results:
+        raise RuntimeError("plugin_results가 없습니다.")
+
+    findings = plugin_results[0].get("findings") or []
+    if not findings:
+        raise RuntimeError("findings가 없습니다.")
+
+    print(f"[OK] S2N finding count: {len(findings)}")
+    return findings[0]
+
+
+def build_agent_response(finding: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "task": "selection",
+        "should_run": True,
+        "context_known": True,
+        "fallback": False,
+        "reason": "s2n detected reflected XSS payload in HTTP response.",
+        "selected_plugin": finding.get("plugin") or "xss",
+        "severity": finding.get("severity") or "HIGH",
+        "confidence": finding.get("confidence") or "FIRM",
+        "payload": finding.get("payload"),
+        "parameter": finding.get("parameter"),
+        "evidence": finding.get("evidence"),
+    }
+
+
+def normalize_rag_contexts(rag_contexts: Any) -> list[dict[str, Any]]:
+    """
+    report_generator.generate_markdown_report()는 List[Dict]를 기대하므로
+    retriever 반환값이 dict이면 내부 리스트를 꺼내서 맞춘다.
+    """
+    if isinstance(rag_contexts, list):
+        return rag_contexts
+
+    if isinstance(rag_contexts, dict):
+        for key in [
+            "contexts",
+            "results",
+            "rag_contexts",
+            "internal_contexts",
+            "external_references",
+        ]:
+            value = rag_contexts.get(key)
+            if isinstance(value, list):
+                return value
+
+        merged = []
+        internal = rag_contexts.get("internal") or rag_contexts.get("internal_contexts") or []
+        external = rag_contexts.get("external") or rag_contexts.get("external_references") or []
+
+        if isinstance(internal, list):
+            merged.extend(internal)
+        if isinstance(external, list):
+            merged.extend(external)
+
+        if merged:
+            return merged
+
+    return []
+
+
+def main() -> None:
+    print("[1] Loading S2N JSON...")
+    raw_finding = load_first_s2n_finding(INPUT_JSON)
+
+    print("[2] Importing real pipeline modules...")
+    from s2n_ai.finding_normalizer import normalize_xss_finding
+    from s2n_ai.rag_query_builder import (
+        build_rag_query_from_finding,
+        build_rag_metadata_from_finding,
+    )
+    from s2n_ai.hybrid_rag_retriever import retrieve_hybrid_context
+    from s2n_ai.report_generator import generate_markdown_report, save_report
+    from s2n_ai.pdf_generator import generate_xss_pdf_report
+
+    print(f"[DEBUG] normalize_xss_finding signature: {inspect.signature(normalize_xss_finding)}")
+    print(f"[DEBUG] build_rag_query_from_finding signature: {inspect.signature(build_rag_query_from_finding)}")
+    print(f"[DEBUG] build_rag_metadata_from_finding signature: {inspect.signature(build_rag_metadata_from_finding)}")
+    print(f"[DEBUG] retrieve_hybrid_context signature: {inspect.signature(retrieve_hybrid_context)}")
+    print(f"[DEBUG] generate_markdown_report signature: {inspect.signature(generate_markdown_report)}")
+    print(f"[DEBUG] save_report signature: {inspect.signature(save_report)}")
+    print(f"[DEBUG] generate_xss_pdf_report signature: {inspect.signature(generate_xss_pdf_report)}")
+
+    print("[3] Building agent_response...")
+    agent_response = build_agent_response(raw_finding)
+
+    print("[4] Normalizing S2N finding with real normalizer...")
+    normalized = normalize_xss_finding(raw_finding, agent_response)
+
+    NORMALIZED_JSON.parent.mkdir(parents=True, exist_ok=True)
+    NORMALIZED_JSON.write_text(
+        json.dumps(normalized, indent=2, ensure_ascii=False),
+        encoding="utf-8",
+    )
+    print(f"[OK] normalized saved: {NORMALIZED_JSON}")
+
+    print("[5] Building RAG query with real rag_query_builder...")
+    rag_query = build_rag_query_from_finding(normalized)
+    rag_metadata = build_rag_metadata_from_finding(normalized)
+
+    print(f"[OK] rag_query: {rag_query}")
+    print(f"[OK] rag_metadata: {rag_metadata}")
+
+    print("[6] Retrieving hybrid RAG context with real retriever...")
+
+    # 핵심 수정:
+    # retrieve_hybrid_context()는 rag_query 문자열이 아니라 finding dict를 받는다.
+    rag_contexts_raw = retrieve_hybrid_context(
+        normalized,
+        top_k_internal=3,
+        top_k_external=4,
+        internal_backend="chroma",
+    )
+
+    print(f"[DEBUG] raw rag_contexts type: {type(rag_contexts_raw)}")
+
+    rag_contexts = normalize_rag_contexts(rag_contexts_raw)
+
+    print(f"[OK] rag contexts loaded: {len(rag_contexts)}")
+
+    print("[7] Generating Markdown with real report_generator...")
+    markdown = generate_markdown_report(normalized, rag_contexts)
+
+    if markdown is None:
+        raise RuntimeError("generate_markdown_report() returned None")
+
+    if not isinstance(markdown, str):
+        markdown = str(markdown)
+
+    print("[8] Saving Markdown with real save_report...")
+    saved_path = save_report(markdown, str(MARKDOWN_OUT))
+
+    if not MARKDOWN_OUT.exists():
+        MARKDOWN_OUT.write_text(markdown, encoding="utf-8")
+
+    print(f"[OK] markdown saved: {MARKDOWN_OUT}")
+    print(f"[OK] save_report returned: {saved_path}")
+
+    print("[9] Generating PDF with real pdf_generator...")
+
+    # pdf_generator 실제 시그니처 기준:
+    # generate_xss_pdf_report(finding, rag_contexts, output_path)
+    pdf_result = generate_xss_pdf_report(
+        normalized,
+        rag_contexts,
+        str(PDF_OUT),
+    )
+
+    if PDF_OUT.exists():
+        print(f"[OK] pdf saved: {PDF_OUT}")
+    else:
+        print("[WARN] PDF file was not created.")
+        print(f"[WARN] pdf_result: {pdf_result}")
+
+    print("[DONE]")
+
+
+if __name__ == "__main__":
+    main()

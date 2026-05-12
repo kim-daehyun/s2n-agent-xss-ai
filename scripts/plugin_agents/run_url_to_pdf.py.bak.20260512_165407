@@ -1,0 +1,686 @@
+
+from __future__ import annotations
+
+import argparse
+import json
+import re
+from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
+from urllib.parse import parse_qs, urlencode, urljoin, urlparse, urlunparse
+
+import requests
+from bs4 import BeautifulSoup
+
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+REPORT_DIR = PROJECT_ROOT / "reports" / "generated"
+CHROMA_DIR = PROJECT_ROOT / "storage" / "chroma_xss_guides"
+DEFAULT_ADAPTER_PATH = PROJECT_ROOT / "adapters" / "xss-agent-qwen3b-clean-peft"
+
+PAYLOADS = [
+    "<script>alert(1)</script>",
+    '"><script>alert(1)</script>',
+    "'><script>alert(1)</script>",
+]
+
+PARAM_CANDIDATES = [
+    "q", "query", "search", "keyword", "name", "term", "input",
+    "message", "comment", "title", "id", "page",
+]
+
+PATH_CANDIDATES = [
+    "/",
+    "/search",
+    "/rest/products/search",
+    "/vulnerabilities/xss_r/",
+]
+
+
+def now_iso() -> str:
+    return datetime.utcnow().isoformat() + "Z"
+
+
+def safe_slug(value: str) -> str:
+    text = "".join(ch if ch.isalnum() else "_" for ch in value.lower())
+    text = "_".join(part for part in text.split("_") if part)
+    return text[:80] or "url_xss"
+
+
+def sanitize_url(raw: str) -> str:
+    text = (raw or "").strip().strip('"').strip("'")
+    text = re.sub(r"^\s*target\s*url\s*:\s*", "", text, flags=re.I).strip()
+    text = re.sub(r"\s+", "", text)
+    parsed = urlparse(text)
+    if parsed.scheme not in ("http", "https") or not parsed.netloc:
+        raise ValueError(f"Invalid URL: {text!r}")
+    return text
+
+
+def sanitize_cookie(raw: Optional[str]) -> Optional[str]:
+    if raw is None:
+        return None
+    text = raw.strip().strip('"').strip("'")
+    text = re.sub(r"^\s*cookie\s*header.*?:\s*", "", text, flags=re.I).strip()
+    if not text:
+        return None
+    text = re.sub(r"[\r\n\t]+", "", text)
+    text = re.sub(r"\s*;\s*", "; ", text)
+    return text
+
+
+def redact_cookie(cookie: Optional[str]) -> str:
+    if not cookie:
+        return "-"
+    parts = []
+    for item in cookie.split(";"):
+        if "=" not in item:
+            continue
+        k, v = item.split("=", 1)
+        k = k.strip()
+        v = v.strip()
+        if k == "PHPSESSID" and len(v) > 10:
+            parts.append(f"PHPSESSID={v[:6]}...{v[-4:]}")
+        else:
+            parts.append(f"{k}={v}")
+    return "; ".join(parts) or "-"
+
+
+def make_session(cookie: Optional[str]) -> requests.Session:
+    session = requests.Session()
+    session.headers.update({
+        "User-Agent": "s2n-url-to-pdf-auto-probe/0.7",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,application/json;q=0.8,*/*;q=0.7",
+    })
+    if cookie:
+        session.headers["Cookie"] = cookie
+    return session
+
+
+def first_query_param(url: str) -> Tuple[str, str]:
+    parsed = urlparse(url)
+    query = parse_qs(parsed.query, keep_blank_values=True)
+    if not query:
+        return "-", ""
+    for preferred in ("name", "q", "query", "search", "keyword", "term"):
+        if preferred in query and query[preferred]:
+            return preferred, query[preferred][0]
+    for key, values in query.items():
+        return key, values[0] if values else ""
+    return "-", ""
+
+
+def url_contains_payload(url: str) -> bool:
+    _, value = first_query_param(url)
+    value = value.lower()
+    return "<script" in value or "alert(" in value
+
+
+def inject_param(url: str, param: str, payload: str) -> str:
+    parsed = urlparse(url)
+    query = parse_qs(parsed.query, keep_blank_values=True)
+    query[param] = [payload]
+    return urlunparse((
+        parsed.scheme,
+        parsed.netloc,
+        parsed.path or "/",
+        parsed.params,
+        urlencode(query, doseq=True),
+        "",
+    ))
+
+
+def same_origin(a: str, b: str) -> bool:
+    pa = urlparse(a)
+    pb = urlparse(b)
+    return pa.scheme == pb.scheme and pa.netloc == pb.netloc
+
+
+def compact_url(url: str) -> str:
+    parsed = urlparse(url)
+    out = parsed.netloc + (parsed.path or "/")
+    if parsed.query:
+        out += "_query"
+    return out
+
+
+def make_finding(url: str, parameter: str, payload: str, response: requests.Response, body: str, mode: str) -> Dict[str, Any]:
+    evidence = (
+        "Payload reflected in HTTP response without clear output encoding; "
+        f"reflected_value={payload}; verification=payload_reflected; "
+        f"status_code={response.status_code}; method=GET; parameter={parameter}; discovery_mode={mode};"
+    )
+    return {
+        "id": "xss-1",
+        "title": "Reflected Cross-Site Scripting Detected",
+        "severity": "HIGH",
+        "confidence": "FIRM",
+        "url": url,
+        "target_url": url,
+        "method": "GET",
+        "parameter": parameter,
+        "payload": payload,
+        "vuln_type": "XSS",
+        "xss_type": "reflected",
+        "cwe": "CWE-79",
+        "owasp_category": "Injection / Cross-Site Scripting",
+        "injection_context": "html_body",
+        "parameter_location": "query",
+        "sink": "http_response_html_body",
+        "reflected": True,
+        "reflection_detected": True,
+        "reflected_value": payload,
+        "verification": "payload_reflected",
+        "discovery_mode": mode,
+        "description": "User-controlled input was reflected in the HTTP response without clear output encoding.",
+        "evidence": evidence,
+        "response_snippet": body[:1800],
+        "risk": {
+            "risk_score": 85,
+            "likelihood": "High",
+            "impact": "High",
+            "business_impact": "An attacker may execute JavaScript in a victim browser or manipulate page content.",
+        },
+        "agent_response": {
+            "task": "xss_detection",
+            "should_run": True,
+            "context_known": True,
+            "selected_plugin": "xss",
+            "severity": "HIGH",
+            "confidence": "FIRM",
+            "fallback": True,
+            "model_source": "rule_based_default_before_peft",
+            "reason": "The payload was reflected in the response body without output encoding.",
+            "next_action": "confirm_reflection_and_report",
+            "payload_plan": payload,
+            "false_positive": False,
+        },
+        "rag_hints": {
+            "primary_query": "reflected XSS html body output encoding CWE-79 remediation",
+            "vuln_type": "XSS",
+            "xss_type": "reflected",
+            "cwe": "CWE-79",
+            "owasp_category": "Injection / Cross-Site Scripting",
+            "injection_context": "html_body",
+            "recommended_docs": ["xss_remediation", "output_encoding", "content_security_policy"],
+            "official_references": ["OWASP XSS Prevention Cheat Sheet", "CWE-79", "MDN XSS", "PortSwigger Reflected XSS"],
+        },
+        "report_fields": {
+            "title": "Reflected Cross-Site Scripting Detected",
+            "severity": "HIGH",
+            "confidence": "FIRM",
+            "target_url": url,
+            "method": "GET",
+            "parameter": parameter,
+            "payload": payload,
+            "reflection_detected": True,
+            "reflected_value": payload,
+            "verification": "payload_reflected",
+            "evidence": evidence,
+            "response_snippet": body[:1800],
+        },
+    }
+
+
+def scan_result(target_url: str, finding: Dict[str, Any], checked: int) -> Dict[str, Any]:
+    return {
+        "scan_id": "url-scan-" + datetime.utcnow().strftime("%Y%m%d%H%M%S"),
+        "target_url": target_url,
+        "scanner_version": "url-to-pdf-auto-probe-0.7",
+        "start_time": now_iso(),
+        "end_time": now_iso(),
+        "duration_seconds": 0,
+        "summary": {
+            "total_vulnerabilities": 1,
+            "severity_counts": {"HIGH": 1},
+            "plugins_run": ["xss"],
+            "total_requests": checked,
+        },
+        "plugin_results": [{
+            "plugin": "xss",
+            "status": "SUCCESS",
+            "findings": [finding],
+            "duration": 0,
+            "requests_sent": checked,
+        }],
+        "findings": [finding],
+    }
+
+
+def direct_scan(url: str, cookie: Optional[str], timeout: int) -> Dict[str, Any]:
+    param, payload = first_query_param(url)
+    if not payload:
+        raise RuntimeError("No payload exists in URL. Auto-probe should be used.")
+    session = make_session(cookie)
+    response = session.get(url, timeout=timeout, allow_redirects=False)
+    body = response.text or ""
+    print(f"[DEBUG] request url: {url}")
+    print(f"[DEBUG] sent cookie: {redact_cookie(cookie)}")
+    print(f"[DEBUG] response status: {response.status_code}")
+    if response.status_code in (301, 302, 303, 307, 308):
+        raise RuntimeError(f"Target redirected. status={response.status_code}, location={response.headers.get('Location', '-')}")
+    if payload not in body:
+        raise RuntimeError(f"Payload was not reflected. status={response.status_code}, parameter={param}, payload={payload!r}")
+    return scan_result(url, make_finding(url, param, payload, response, body, "direct_url_validation"), checked=1)
+
+
+def discover(base_url: str, cookie: Optional[str], timeout: int) -> Tuple[List[str], List[str]]:
+    session = make_session(cookie)
+    print(f"[AUTO] collect base: {base_url}")
+    response = session.get(base_url, timeout=timeout, allow_redirects=True)
+    print(f"[AUTO] base status: {response.status_code}")
+    origin_parsed = urlparse(response.url or base_url)
+    origin = f"{origin_parsed.scheme}://{origin_parsed.netloc}"
+
+    urls: List[str] = []
+    params: List[str] = []
+
+    def add_url(raw: str) -> None:
+        if not raw:
+            return
+        absolute = urljoin(origin + "/", raw).split("#", 1)[0]
+        if same_origin(origin, absolute) and absolute not in urls:
+            urls.append(absolute)
+
+    add_url(base_url)
+    for path in PATH_CANDIDATES:
+        add_url(path)
+
+    for key in parse_qs(urlparse(base_url).query, keep_blank_values=True).keys():
+        if key not in params:
+            params.append(key)
+
+    soup = BeautifulSoup(response.text or "", "html.parser")
+    for a in soup.find_all("a", href=True)[:40]:
+        add_url(a.get("href") or "")
+
+    for form in soup.find_all("form")[:20]:
+        add_url(form.get("action") or base_url)
+        for field in form.find_all(["input", "textarea", "select"]):
+            name = field.get("name")
+            if name and name not in params:
+                params.append(name)
+
+    for p in PARAM_CANDIDATES:
+        if p not in params:
+            params.append(p)
+
+    print(f"[AUTO] candidate urls={len(urls)}")
+    print(f"[AUTO] candidate params={params[:20]}")
+    return urls, params
+
+
+def auto_probe(base_url: str, cookie: Optional[str], timeout: int, max_candidates: int) -> Dict[str, Any]:
+    urls, params = discover(base_url, cookie, timeout)
+    session = make_session(cookie)
+    checked = 0
+    examples: List[str] = []
+
+    print("[AUTO] start internal payload injection")
+    for base in urls:
+        for param in params:
+            for payload in PAYLOADS:
+                target = inject_param(base, param, payload)
+                checked += 1
+                if len(examples) < 5:
+                    examples.append(target)
+                print(f"[AUTO] try {checked}: {target[:180]}")
+                try:
+                    response = session.get(target, timeout=timeout, allow_redirects=False)
+                except Exception as exc:
+                    print(f"[AUTO][WARN] request failed: {type(exc).__name__}: {exc}")
+                    if checked >= max_candidates:
+                        break
+                    continue
+
+                body = response.text or ""
+                if response.status_code in (301, 302, 303, 307, 308):
+                    print(f"[AUTO] redirect skipped: {response.status_code} {response.headers.get('Location', '-')}")
+                elif payload in body:
+                    print(f"[AUTO][HIT] reflected payload found. param={param}")
+                    finding = make_finding(target, param, payload, response, body, "auto_probe")
+                    return scan_result(base_url, finding, checked=checked)
+
+                if checked >= max_candidates:
+                    break
+            if checked >= max_candidates:
+                break
+        if checked >= max_candidates:
+            break
+
+    raise RuntimeError(
+        "No reflected XSS confirmed by auto-probe. "
+        "This means raw HTTP reflected XSS was not confirmed. "
+        "SPA/DOM XSS needs browser-based verification. "
+        f"checked={checked}, examples={examples[:3]}"
+    )
+
+
+def extract_json(text: str) -> Optional[Dict[str, Any]]:
+    if not text:
+        return None
+    text = text.strip()
+    text = re.sub(r"^```(?:json)?\s*", "", text, flags=re.I)
+    text = re.sub(r"\s*```$", "", text)
+    try:
+        value = json.loads(text)
+        return value if isinstance(value, dict) else None
+    except Exception:
+        pass
+    start = text.find("{")
+    end = text.rfind("}")
+    if start >= 0 and end > start:
+        try:
+            value = json.loads(text[start:end + 1])
+            return value if isinstance(value, dict) else None
+        except Exception:
+            return None
+    return None
+
+
+def peft_prompt(finding: Dict[str, Any]) -> str:
+    return (
+        "You are XSSAgent. Return only JSON with keys task, should_run, context_known, "
+        "confidence, fallback, reason, next_action, payload_plan, false_positive.\n"
+        f"URL: {finding.get('url')}\n"
+        f"Parameter: {finding.get('parameter')}\n"
+        f"Payload: {finding.get('payload')}\n"
+        f"Evidence: {finding.get('evidence')}\n"
+    )
+
+
+def run_peft(finding: Dict[str, Any], adapter_path: Path) -> Dict[str, Any]:
+    import torch
+    from peft import PeftConfig, PeftModel
+    from transformers import AutoModelForCausalLM, AutoTokenizer
+
+    adapter_path = adapter_path.resolve()
+    config = PeftConfig.from_pretrained(str(adapter_path))
+    base_model = config.base_model_name_or_path
+    print(f"[PEFT] adapter path: {adapter_path}")
+    print(f"[PEFT] base model: {base_model}")
+
+    tokenizer = AutoTokenizer.from_pretrained(base_model, trust_remote_code=True)
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token
+
+    dtype = torch.float16 if torch.cuda.is_available() else torch.float32
+    device_map = "auto" if torch.cuda.is_available() else None
+    base = AutoModelForCausalLM.from_pretrained(
+        base_model,
+        trust_remote_code=True,
+        torch_dtype=dtype,
+        device_map=device_map,
+    )
+    model = PeftModel.from_pretrained(base, str(adapter_path))
+    model.eval()
+    if device_map is None:
+        model.to("cpu")
+
+    messages = [
+        {"role": "system", "content": "You are a security plugin decision agent. Return only JSON."},
+        {"role": "user", "content": peft_prompt(finding)},
+    ]
+    try:
+        prompt = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+    except Exception:
+        prompt = peft_prompt(finding)
+
+    inputs = tokenizer(prompt, return_tensors="pt", truncation=True, max_length=2048)
+    device = next(model.parameters()).device
+    inputs = {key: value.to(device) for key, value in inputs.items()}
+
+    print("[PEFT] generating XSSAgent decision...")
+    with torch.no_grad():
+        output = model.generate(
+            **inputs,
+            max_new_tokens=256,
+            do_sample=False,
+            pad_token_id=tokenizer.eos_token_id,
+        )
+
+    generated = output[0][inputs["input_ids"].shape[-1]:]
+    raw = tokenizer.decode(generated, skip_special_tokens=True).strip()
+    print(f"[PEFT] raw response: {raw[:800]}")
+
+    parsed = extract_json(raw) or {
+        "task": "xss_detection",
+        "should_run": True,
+        "context_known": True,
+        "confidence": "FIRM",
+        "fallback": True,
+        "reason": raw[:500] or "PEFT adapter returned empty response.",
+        "next_action": "confirm_reflection_and_report",
+        "payload_plan": finding.get("payload", ""),
+        "false_positive": False,
+    }
+    parsed.setdefault("task", "xss_detection")
+    parsed.setdefault("should_run", True)
+    parsed.setdefault("context_known", True)
+    parsed.setdefault("confidence", "FIRM")
+    parsed.setdefault("fallback", False)
+    parsed.setdefault("reason", "PEFT XSSAgent decision generated.")
+    parsed.setdefault("next_action", "confirm_reflection_and_report")
+    parsed.setdefault("payload_plan", finding.get("payload", ""))
+    parsed.setdefault("false_positive", False)
+    parsed["model_source"] = "fine_tuned_peft_adapter"
+    parsed["adapter_path"] = str(adapter_path)
+    return parsed
+
+
+def attach_peft(scan: Dict[str, Any], adapter_path: Path) -> Dict[str, Any]:
+    finding = scan["findings"][0]
+    try:
+        agent = run_peft(finding, adapter_path)
+        finding["agent_response"] = agent
+        finding["agent_decision"] = agent
+        print("[OK] PEFT XSSAgent response attached to finding")
+    except Exception as exc:
+        print(f"[WARN] PEFT failed. Keeping rule-based response. reason={type(exc).__name__}: {exc}")
+        finding.setdefault("agent_response", {})
+        finding["agent_response"]["model_source"] = "peft_failed_rule_based_fallback"
+        finding["agent_response"]["fallback_reason"] = f"{type(exc).__name__}: {exc}"
+    for result in scan.get("plugin_results", []):
+        if result.get("plugin") == "xss":
+            result["findings"] = [finding]
+    return scan
+
+
+def ensure_index(reindex: bool) -> None:
+    try:
+        from s2n_ai.vector_rag_indexer import build_vector_index
+        from s2n_ai.vector_rag_retriever import get_chroma_collection
+
+        should_build = reindex
+        if not CHROMA_DIR.exists():
+            should_build = True
+        else:
+            try:
+                count = get_chroma_collection().count()
+                print(f"[OK] ChromaDB index ready: {count} chunks")
+                if count <= 0:
+                    should_build = True
+            except Exception:
+                should_build = True
+
+        if should_build:
+            print("[RAG] Building ChromaDB vector index from docs/security_guides/*.md ...")
+            summary = build_vector_index(reset=True)
+            print(f"[OK] ChromaDB index built: {json.dumps(summary, ensure_ascii=False)}")
+    except Exception as exc:
+        print(f"[WARN] ChromaDB index preparation failed: {type(exc).__name__}: {exc}")
+
+
+def normalize(finding: Dict[str, Any]) -> Dict[str, Any]:
+    from s2n_ai.finding_normalizer import normalize_xss_finding
+
+    agent = finding.get("agent_response") or {}
+    try:
+        normalized = normalize_xss_finding(finding, agent)
+    except TypeError:
+        try:
+            normalized = normalize_xss_finding(raw_result=finding, agent_response=agent)
+        except TypeError:
+            normalized = normalize_xss_finding(finding)
+
+    normalized.setdefault("agent_response", agent)
+    normalized.setdefault("agent_decision", agent)
+    normalized.setdefault("risk", finding.get("risk") or {})
+    normalized.setdefault("rag_hints", finding.get("rag_hints") or {})
+    normalized.setdefault("report_fields", finding.get("report_fields") or {})
+    return normalized
+
+
+def retrieve_rag(normalized: Dict[str, Any], reindex: bool) -> List[Dict[str, Any]]:
+    ensure_index(reindex)
+    try:
+        from s2n_ai.hybrid_rag_retriever import retrieve_hybrid_context
+
+        result = retrieve_hybrid_context(
+            finding=normalized,
+            top_k_internal=3,
+            top_k_external=4,
+            internal_backend="chroma",
+        )
+        if isinstance(result, dict):
+            contexts = result.get("report_contexts")
+            if isinstance(contexts, list):
+                print(f"[OK] RAG report_contexts loaded: {len(contexts)}")
+                return [c for c in contexts if isinstance(c, dict)]
+        if isinstance(result, list):
+            print(f"[OK] RAG contexts loaded: {len(result)}")
+            return [c for c in result if isinstance(c, dict)]
+    except Exception as exc:
+        print(f"[WARN] RAG retrieval failed: {type(exc).__name__}: {exc}")
+    return []
+
+
+def write_no_finding_pdf(target_url: str, output_pdf: Path, reason: str) -> None:
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.styles import getSampleStyleSheet
+    from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+
+    output_pdf.parent.mkdir(parents=True, exist_ok=True)
+    doc = SimpleDocTemplate(str(output_pdf), pagesize=A4)
+    styles = getSampleStyleSheet()
+    rows = [
+        ["Target URL", target_url],
+        ["Result", "No reflected XSS confirmed"],
+        ["Reason", reason],
+        ["Note", "Raw HTTP reflected XSS was not confirmed. SPA/DOM XSS requires browser-based verification."],
+    ]
+    table = Table(rows, colWidths=[120, 360])
+    table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (0, -1), colors.lightgrey),
+        ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+    ]))
+    doc.build([
+        Paragraph("S2N XSS Auto-Probe Report", styles["Title"]),
+        Spacer(1, 12),
+        Paragraph("No confirmed reflected XSS finding was generated.", styles["BodyText"]),
+        Spacer(1, 12),
+        table,
+    ])
+
+
+def generate(scan: Dict[str, Any], output_pdf: Path, reindex: bool) -> None:
+    from s2n_ai.pdf_generator import generate_xss_pdf_report
+
+    finding = scan["findings"][0]
+    normalized = normalize(finding)
+    normalized["_all_findings"] = scan["findings"]
+    normalized["_scan_summary"] = scan.get("summary") or {}
+
+    rag_contexts = retrieve_rag(normalized, reindex)
+
+    REPORT_DIR.mkdir(parents=True, exist_ok=True)
+    slug = safe_slug(compact_url(scan["target_url"]))
+    raw_json = REPORT_DIR / f"{slug}_s2n_result.json"
+    norm_json = REPORT_DIR / f"{slug}_normalized.json"
+    rag_json = REPORT_DIR / f"{slug}_rag_contexts.json"
+
+    raw_json.write_text(json.dumps(scan, ensure_ascii=False, indent=2), encoding="utf-8")
+    norm_json.write_text(json.dumps(normalized, ensure_ascii=False, indent=2), encoding="utf-8")
+    rag_json.write_text(json.dumps(rag_contexts, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    generate_xss_pdf_report(
+        finding=normalized,
+        rag_contexts=rag_contexts,
+        pdf_path=str(output_pdf),
+        all_findings=scan["findings"],
+        scan_summary=scan.get("summary") or {},
+    )
+    print(f"[OK] raw scan json: {raw_json}")
+    print(f"[OK] normalized json: {norm_json}")
+    print(f"[OK] rag contexts json: {rag_json}")
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--url")
+    parser.add_argument("--cookie")
+    parser.add_argument("--output-pdf", default=str(REPORT_DIR / "url_xss_report.pdf"))
+    parser.add_argument("--timeout", type=int, default=20)
+    parser.add_argument("--max-candidates", type=int, default=80)
+    parser.add_argument("--reindex", action="store_true")
+    parser.add_argument("--use-peft-agent", action="store_true")
+    parser.add_argument("--adapter-path", default=str(DEFAULT_ADAPTER_PATH))
+    args = parser.parse_args()
+
+    print("[S2N URL-to-PDF local test runner]")
+    print("Input: URL")
+    print("Output: reports/generated/url_xss_report.pdf")
+    print("Mode: payload URL direct validation OR base URL auto-probe")
+    print("RAG: ChromaDB internal guide + official reference catalog")
+    print(f"PEFT XSSAgent: {'enabled' if args.use_peft_agent else 'disabled'}")
+    print("")
+
+    raw_url = args.url or input("Target URL: ").strip()
+    raw_cookie = args.cookie
+    if raw_cookie is None:
+        raw_cookie = input("Cookie header, optional. Press Enter to skip: ").strip() or None
+
+    url = sanitize_url(raw_url)
+    cookie = sanitize_cookie(raw_cookie)
+
+    output_pdf = Path(args.output_pdf)
+    if not output_pdf.is_absolute():
+        output_pdf = PROJECT_ROOT / output_pdf
+
+    try:
+        if url_contains_payload(url):
+            print("[2] Payload exists in URL. Running direct validation...")
+            scan = direct_scan(url, cookie, args.timeout)
+        else:
+            print("[2] URL has no payload. Running auto-probe with internal payload injection...")
+            scan = auto_probe(url, cookie, args.timeout, args.max_candidates)
+    except Exception as exc:
+        reason = f"{type(exc).__name__}: {exc}"
+        print(f"[NO-FINDING] {reason}")
+        write_no_finding_pdf(url, output_pdf, reason)
+        print(f"[OK] no-finding PDF report: {output_pdf}")
+        print(f"open {output_pdf}")
+        return 2
+
+    print(f"[OK] reflected finding count: {len(scan['findings'])}")
+
+    if args.use_peft_agent:
+        print("[3] Fine-tuned PEFT XSSAgent inference...")
+        scan = attach_peft(scan, Path(args.adapter_path))
+    else:
+        print("[3] Fine-tuned PEFT XSSAgent inference skipped.")
+
+    print("[4] Normalizer/RAG/PDF pipeline...")
+    generate(scan, output_pdf, args.reindex)
+
+    print(f"[OK] PDF report: {output_pdf}")
+    print("")
+    print("Open:")
+    print(f"open {output_pdf}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -6,10 +6,145 @@ from html import escape
 from datetime import datetime
 from urllib.parse import urlparse, parse_qs
 import re
-from s2n_ai.pdf_vertical_summary_patch import install_vertical_summary_patch
-install_vertical_summary_patch(globals())
 
 
+# --- S2N PDF summary table hard fix v4 ---
+try:
+    _S2N_ORIGINAL_TABLE = Table
+
+    def _s2n_cell_text(value):
+        if value is None:
+            return "-"
+        text = getattr(value, "text", None)
+        if text is not None:
+            return str(text)
+        return str(value)
+
+    def _s2n_compact_payload(text: str) -> str:
+        raw = str(text)
+        lower = raw.lower()
+        if "<iframe" in lower or ("iframe" in lower and "javascript" in lower):
+            return "iframe javascript alert"
+        if "<script" in lower or "script" in lower:
+            return "script alert"
+        if "javascript:alert" in lower:
+            return "javascript alert"
+        if len(raw) > 28:
+            return raw[:24] + "..."
+        return raw
+
+    def _s2n_compact_value(text: str, max_len: int = 30) -> str:
+        raw = str(text)
+        if len(raw) <= max_len:
+            return raw
+        return raw[:max_len - 3] + "..."
+
+    def _s2n_para(value, font_size: int = 6, leading: int = 8):
+        from xml.sax.saxutils import escape as _xml_escape
+        from reportlab.lib.styles import ParagraphStyle
+        from reportlab.platypus import Paragraph
+
+        text = _xml_escape(_s2n_cell_text(value))
+        words = []
+        for token in text.split(" "):
+            if len(token) > 14:
+                token = "<br/>".join(token[i:i + 14] for i in range(0, len(token), 14))
+            words.append(token)
+        text = " ".join(words)
+
+        style = ParagraphStyle(
+            name="S2NHardWrapCellV4",
+            fontName="Helvetica",
+            fontSize=font_size,
+            leading=leading,
+            wordWrap="CJK",
+            splitLongWords=True,
+            spaceAfter=0,
+            spaceBefore=0,
+        )
+        return Paragraph(text, style)
+
+    def _s2n_is_all_findings_table(data) -> bool:
+        try:
+            header = " ".join(_s2n_cell_text(c) for c in data[0]).lower()
+            return (
+                "id" in header
+                and "severity" in header
+                and "confidence" in header
+                and "target path" in header
+                and "payload" in header
+                and "verification" in header
+            )
+        except Exception:
+            return False
+
+    def _s2n_rebuild_summary_table(data):
+        new_rows = [["ID", "Severity", "Confidence", "Target Path", "Param", "Verification", "Reflected"]]
+        for row in data[1:]:
+            cells = [_s2n_cell_text(c) for c in row]
+            if len(cells) >= 8:
+                fid, sev, conf, path, param, payload, verification, reflected = cells[:8]
+                new_rows.append([
+                    _s2n_compact_value(fid, 12),
+                    _s2n_compact_value(sev, 10),
+                    _s2n_compact_value(conf, 10),
+                    _s2n_compact_value(path, 32),
+                    _s2n_compact_value(param, 10),
+                    _s2n_compact_value(verification, 24),
+                    _s2n_compact_value(reflected, 8),
+                ])
+                new_rows.append(["", "Payload", _s2n_compact_payload(payload), "", "", "", ""])
+            else:
+                fixed = [_s2n_compact_value(c, 24) for c in cells]
+                while len(fixed) < 7:
+                    fixed.append("")
+                new_rows.append(fixed[:7])
+        return new_rows
+
+    def _s2n_wrap_rows(rows, header_size: int = 7, body_size: int = 6):
+        wrapped = []
+        for r_idx, row in enumerate(rows):
+            wrapped.append([
+                _s2n_para(cell, font_size=(header_size if r_idx == 0 else body_size), leading=(9 if r_idx == 0 else 8))
+                for cell in row
+            ])
+        return wrapped
+
+    def Table(data, *args, **kwargs):  # noqa: N802
+        if _s2n_is_all_findings_table(data):
+            rows = _s2n_rebuild_summary_table(data)
+            data = _s2n_wrap_rows(rows)
+            kwargs["colWidths"] = [34, 52, 58, 124, 42, 120, 46]
+            kwargs.setdefault("repeatRows", 1)
+        else:
+            try:
+                if isinstance(data, (list, tuple)):
+                    safe = []
+                    for row in data:
+                        if isinstance(row, (list, tuple)):
+                            safe.append([_s2n_para(_s2n_cell_text(c), font_size=7, leading=9) for c in row])
+                        else:
+                            safe.append(_s2n_para(_s2n_cell_text(row), font_size=7, leading=9))
+                    data = safe
+            except Exception:
+                pass
+
+        tbl = _S2N_ORIGINAL_TABLE(data, *args, **kwargs)
+        try:
+            from reportlab.platypus import TableStyle
+            tbl.setStyle(TableStyle([
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 4),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+                ("TOPPADDING", (0, 0), (-1, -1), 4),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+            ]))
+        except Exception:
+            pass
+        return tbl
+except Exception:
+    pass
+# --- end S2N PDF summary table hard fix v4 ---
 
 
 
@@ -598,30 +733,39 @@ def _finding_summary_table(findings: List[Dict[str, Any]]) -> str:
     if not findings:
         return "<p>No finding summary available.</p>"
 
-    sections = []
-    for idx, f in enumerate(findings, start=1):
+    rows = []
+    for f in findings:
         evidence = f.get("evidence") or ""
         reflected = _evidence_get(evidence, "reflection", f.get("reflected", "-"))
         verification = _evidence_get(evidence, "verification", f.get("verification", "-"))
         url = f.get("url") or f.get("target_url") or "-"
+        payload = _short_payload(f.get("payload") or "-")
+        rows.append(
+            "<tr>"
+            f"<td>{_html(f.get('id') or f.get('finding_id') or '-')}</td>"
+            f"<td>{_html(f.get('severity') or '-')}</td>"
+            f"<td>{_html(f.get('confidence') or '-')}</td>"
+            f"<td>{_html(_compact_url(url))}</td>"
+            f"<td>{_html(f.get('parameter') or '-')}</td>"
+            f'<td class="payload-cell">{_code_inline(payload)}</td>'
+            f"<td>{_html(verification)}</td>"
+            f"<td>{_html(reflected)}</td>"
+            "</tr>"
+        )
 
-        sections.append(f"""
-        <section class="finding-summary-item">
-          <h3>2.{idx} Finding {idx}</h3>
-          {_table([
-              ("ID", f.get("id") or f.get("finding_id") or "-"),
-              ("Severity", f.get("severity") or "-"),
-              ("Confidence", f.get("confidence") or "-"),
-              ("Target Path", _compact_url(url)),
-              ("Parameter", f.get("parameter") or "-"),
-              ("Payload", f.get("payload") or "-"),
-              ("Verification", verification),
-              ("Reflected", reflected),
-          ])}
-        </section>
-        """)
-
-    return '<div class="finding-summary-vertical">' + "\n".join(sections) + "</div>"
+    return """
+    <table class="finding-summary">
+      <thead>
+        <tr>
+          <th>ID</th><th>Severity</th><th>Confidence</th><th>Target Path</th>
+          <th>Param</th><th>Payload</th><th>Verification</th><th>Reflected</th>
+        </tr>
+      </thead>
+      <tbody>
+    """ + "\n".join(rows) + """
+      </tbody>
+    </table>
+    """
 
 
 def _css() -> str:
@@ -729,33 +873,63 @@ def _css() -> str:
       overflow-wrap: anywhere;
     }
 
-    .finding-summary-vertical {
+    table.finding-summary {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+      font-size: 7.7pt;
       margin: 7pt 0 10pt 0;
     }
 
-    .finding-summary-item {
-      margin: 0 0 12pt 0;
-      break-inside: avoid;
-      page-break-inside: avoid;
+    table.finding-summary th {
+      background: #e5e7eb;
+      border: 1px solid #d1d5db;
+      padding: 4.5pt;
+      text-align: left;
     }
 
-    .finding-summary-item h3 {
-      font-size: 11pt;
-      margin: 0 0 6pt 0;
-    }
-
-    .finding-summary-item table.kv {
-      margin-top: 0;
-      font-size: 8.6pt;
-    }
-
-    .finding-summary-item table.kv th {
-      width: 24%;
-    }
-
-    .finding-summary-item table.kv td {
+    table.finding-summary td {
+      border: 1px solid #d1d5db;
+      padding: 4.5pt;
+      vertical-align: top;
       word-break: break-word;
       overflow-wrap: anywhere;
+    }
+
+    table.finding-summary th:nth-child(1),
+    table.finding-summary td:nth-child(1) {
+      width: 8%;
+    }
+
+    table.finding-summary th:nth-child(2),
+    table.finding-summary td:nth-child(2),
+    table.finding-summary th:nth-child(3),
+    table.finding-summary td:nth-child(3),
+    table.finding-summary th:nth-child(5),
+    table.finding-summary td:nth-child(5),
+    table.finding-summary th:nth-child(8),
+    table.finding-summary td:nth-child(8) {
+      width: 9%;
+    }
+
+    table.finding-summary th:nth-child(4),
+    table.finding-summary td:nth-child(4) {
+      width: 18%;
+    }
+
+    table.finding-summary th:nth-child(6),
+    table.finding-summary td:nth-child(6) {
+      width: 22%;
+    }
+
+    table.finding-summary th:nth-child(7),
+    table.finding-summary td:nth-child(7) {
+      width: 16%;
+    }
+
+    .payload-cell {
+      font-size: 7.2pt;
+      white-space: normal;
     }
 
     .inline-code {
@@ -858,7 +1032,7 @@ def generate_xss_pdf_report(
     <p class="muted">Generated at: {escape(datetime.utcnow().isoformat())}Z</p>
 
     <h2>1. Executive Summary</h2>
-    <p>This report was generated from an actual S2N scan result and describes confirmed XSS findings.</p>
+    <p>This report was generated from an actual S2N scan result and describes confirmed reflected XSS findings.</p>
     {_table([
         ("Primary Finding", title),
         ("Primary Severity", severity),
@@ -873,13 +1047,13 @@ def generate_xss_pdf_report(
         ("Source Plugin", finding.get("source_plugin") or "xss"),
     ])}
     <div class="okbox">
-      The finding is confirmed because the scanner observed unsafe payload handling through HTTP reflection or browser execution evidence.
+      The finding is confirmed because the submitted payload was reflected in an HTTP response without clear output encoding.
     </div>
   </section>
 
   <section class="page">
     <h2>2. All Findings Summary</h2>
-    <p>The S2N scan detected the following XSS finding records. The following sections summarize each finding in a vertical detail format and then analyze the primary finding.</p>
+    <p>The S2N scan detected the following XSS finding records. The following sections analyze the first finding as the representative case.</p>
     {_finding_summary_table(findings)}
   </section>
 
@@ -942,8 +1116,8 @@ def generate_xss_pdf_report(
 
     <h3>Scoring Basis</h3>
     {_manual_bullets([
-        "Severity is high because browser-executable JavaScript was confirmed by scanner evidence.",
-        "Confidence is firm because the payload and execution/reflection evidence were verified by the scanner.",
+        "Severity is high because browser-executable JavaScript was reflected in the response.",
+        "Confidence is firm because the payload and reflected value were verified in the HTTP response.",
         "Likelihood is high when user-controlled input is returned without context-aware output encoding.",
         "Impact is high because reflected script execution can lead to session theft, user action abuse, or page manipulation.",
     ])}
@@ -1007,5 +1181,3 @@ def generate_xss_pdf_report(
 
 generate_pdf_report = generate_xss_pdf_report
 generate_pdf = generate_xss_pdf_report
-
-

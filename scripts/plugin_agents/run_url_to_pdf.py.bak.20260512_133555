@@ -1,0 +1,411 @@
+from __future__ import annotations
+
+import argparse
+import inspect
+import json
+import re
+from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, List
+from urllib.parse import parse_qs, unquote, urlparse
+
+import requests
+
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+REPORT_DIR = PROJECT_ROOT / "reports" / "generated"
+
+
+def _now() -> str:
+    return datetime.utcnow().isoformat() + "Z"
+
+
+def _safe_filename(value: str) -> str:
+    cleaned = "".join(ch if ch.isalnum() else "_" for ch in value.lower())
+    cleaned = "_".join(part for part in cleaned.split("_") if part)
+    return cleaned[:80] or "url_xss"
+
+
+def _sanitize_url(raw: str) -> str:
+    text = (raw or "").strip()
+
+    # 사용자가 프롬프트 문구까지 같이 붙여넣은 경우 제거:
+    # Target URL: http://...
+    text = re.sub(r"^\s*target\s*url\s*:\s*", "", text, flags=re.I).strip()
+
+    # 양끝 따옴표 제거
+    text = text.strip().strip('"').strip("'").strip()
+
+    # 터미널/복사 과정에서 섞인 공백 제거
+    text = text.replace(" ", "")
+
+    if not text:
+        raise ValueError("URL is empty.")
+
+    parsed = urlparse(text)
+    if parsed.scheme not in ("http", "https"):
+        raise ValueError(
+            f"Invalid URL scheme: {text!r}. URL must start with http:// or https://"
+        )
+
+    return text
+
+
+def _sanitize_cookie(raw: str | None) -> str | None:
+    if raw is None:
+        return None
+
+    text = raw.strip()
+    text = re.sub(r"^\s*cookie\s*header\s*,?\s*optional\.?\s*press\s*enter\s*to\s*skip\s*:\s*", "", text, flags=re.I)
+    text = re.sub(r"^\s*cookie\s*header\s*:\s*", "", text, flags=re.I)
+    text = text.strip().strip('"').strip("'").strip()
+
+    return text or None
+
+
+def _cookie_dict(cookie_header: str | None) -> Dict[str, str]:
+    cookies: Dict[str, str] = {}
+    cookie_header = _sanitize_cookie(cookie_header)
+
+    if not cookie_header:
+        return cookies
+
+    for part in cookie_header.split(";"):
+        if "=" not in part:
+            continue
+        key, value = part.split("=", 1)
+        key = key.strip()
+        value = value.strip()
+        if key:
+            cookies[key] = value
+
+    return cookies
+
+
+def _extract_candidate_payload(url: str) -> tuple[str, str]:
+    parsed = urlparse(url)
+    query = parse_qs(parsed.query, keep_blank_values=True)
+
+    if not query:
+        return "-", ""
+
+    if "name" in query and query["name"]:
+        return "name", query["name"][0]
+
+    for key, values in query.items():
+        if values:
+            return key, values[0]
+
+    return "-", ""
+
+
+def _compact_url(url: str) -> str:
+    parsed = urlparse(url)
+    result = parsed.path or url
+    if parsed.query:
+        result += "?..."
+    return result
+
+
+def direct_xss_scan(url: str, cookie_header: str | None = None, timeout: int = 20) -> Dict[str, Any]:
+    url = _sanitize_url(url)
+    cookies = _cookie_dict(cookie_header)
+
+    parameter, payload = _extract_candidate_payload(url)
+    decoded_payload = unquote(payload)
+
+    session = requests.Session()
+    response = session.get(
+        url,
+        cookies=cookies,
+        timeout=timeout,
+        allow_redirects=False,
+        headers={"User-Agent": "s2n-url-to-pdf-runner/0.2"},
+    )
+
+    body = response.text or ""
+
+    if response.status_code in (301, 302, 303, 307, 308):
+        location = response.headers.get("Location", "")
+        raise RuntimeError(
+            "Target returned redirect instead of vulnerable page. "
+            f"status={response.status_code}, location={location}. "
+            "DVWA login cookie may be missing or expired. Pass cookie when prompted: "
+            "PHPSESSID=...; security=low"
+        )
+
+    reflected = bool(decoded_payload and decoded_payload in body)
+    verification = "payload_reflected" if reflected else "not_reflected"
+
+    if not reflected:
+        snippet = body[:900].replace("\n", " ")
+        raise RuntimeError(
+            "Payload was not reflected in the HTTP response. "
+            f"status={response.status_code}, parameter={parameter}, payload={decoded_payload!r}, "
+            f"body_head={snippet[:300]!r}"
+        )
+
+    finding = {
+        "id": "xss-1",
+        "title": "Reflected Cross-Site Scripting Detected",
+        "severity": "HIGH",
+        "confidence": "FIRM",
+        "url": url,
+        "target_url": url,
+        "method": "GET",
+        "parameter": parameter,
+        "payload": decoded_payload,
+        "vuln_type": "XSS",
+        "xss_type": "reflected",
+        "cwe": "CWE-79",
+        "owasp_category": "Injection / Cross-Site Scripting",
+        "injection_context": "html_body",
+        "reflected": True,
+        "reflection_detected": True,
+        "reflected_value": decoded_payload,
+        "verification": verification,
+        "description": (
+            "User-controlled input was reflected in the HTTP response without clear output encoding. "
+            "The browser may interpret the reflected value as executable HTML or JavaScript."
+        ),
+        "evidence": (
+            "Payload reflected in HTTP response without clear output encoding; "
+            f"reflected_value={decoded_payload}; verification={verification}; "
+            f"content_type={response.headers.get('Content-Type', '-')}; "
+            f"status_code={response.status_code}; method=GET; parameter={parameter};"
+        ),
+        "response_snippet": body[:1800],
+        "risk": {
+            "risk_score": 85,
+            "likelihood": "High",
+            "impact": "High",
+            "business_impact": (
+                "An attacker may execute JavaScript in a victim browser, steal session data, "
+                "perform actions as the user, or manipulate page content."
+            ),
+        },
+        "agent_response": {
+            "task": "xss_detection",
+            "should_run": True,
+            "context_known": True,
+            "selected_plugin": "xss",
+            "severity": "HIGH",
+            "confidence": "FIRM",
+            "fallback": False,
+            "reason": "The payload was reflected in the response body without output encoding.",
+        },
+        "rag_hints": {
+            "vuln_type": "XSS",
+            "xss_type": "reflected",
+            "cwe": "CWE-79",
+            "recommended_docs": ["xss_remediation", "output_encoding", "content_security_policy"],
+            "official_references": ["OWASP XSS Prevention Cheat Sheet", "CWE-79", "MDN XSS", "PortSwigger Reflected XSS"],
+        },
+        "report_fields": {
+            "title": "Reflected Cross-Site Scripting Detected",
+            "severity": "HIGH",
+            "confidence": "FIRM",
+            "target_url": url,
+            "method": "GET",
+            "parameter": parameter,
+            "payload": decoded_payload,
+            "reflection_detected": True,
+            "reflected_value": decoded_payload,
+            "verification": verification,
+            "evidence": (
+                "Payload reflected in HTTP response without clear output encoding; "
+                f"reflected_value={decoded_payload}; verification={verification}"
+            ),
+            "response_snippet": body[:1800],
+        },
+    }
+
+    result = {
+        "scan_id": "url-scan-" + datetime.utcnow().strftime("%Y%m%d%H%M%S"),
+        "target_url": url,
+        "scanner_version": "url-to-pdf-runner-0.2",
+        "start_time": _now(),
+        "end_time": _now(),
+        "duration_seconds": 0,
+        "config": {
+            "target_url": url,
+            "scanner_config": {
+                "crawl_depth": 0,
+                "follow_redirects": False,
+                "mode": "direct_url_validation",
+            },
+            "plugin_configs": {
+                "xss": {
+                    "enabled": True,
+                    "severity_threshold": "LOW",
+                }
+            },
+        },
+        "summary": {
+            "total_vulnerabilities": 1,
+            "severity_counts": {"HIGH": 1},
+            "plugins_run": ["xss"],
+            "total_requests": 1,
+        },
+        "plugin_results": [
+            {
+                "plugin": "xss",
+                "status": "SUCCESS",
+                "findings": [finding],
+                "duration": 0,
+                "requests_sent": 1,
+            }
+        ],
+        "findings": [finding],
+    }
+
+    return result
+
+
+def normalize_finding(raw_finding: Dict[str, Any]) -> Dict[str, Any]:
+    from s2n_ai.finding_normalizer import normalize_xss_finding
+
+    agent_response = raw_finding.get("agent_response") or {}
+
+    try:
+        normalized = normalize_xss_finding(raw_finding, agent_response)
+    except TypeError:
+        try:
+            normalized = normalize_xss_finding(raw_result=raw_finding, agent_response=agent_response)
+        except TypeError:
+            normalized = normalize_xss_finding(raw_finding)
+
+    if not isinstance(normalized, dict):
+        raise TypeError(f"normalize_xss_finding returned non-dict: {type(normalized)}")
+
+    normalized.setdefault("agent_response", agent_response)
+    normalized.setdefault("risk", raw_finding.get("risk") or {})
+    normalized.setdefault("rag_hints", raw_finding.get("rag_hints") or {})
+    normalized.setdefault("report_fields", raw_finding.get("report_fields") or {})
+    normalized.setdefault("_all_findings", [raw_finding])
+    normalized.setdefault("_scan_summary", {"total_vulnerabilities": 1, "severity_counts": {"HIGH": 1}, "total_requests": 1})
+    return normalized
+
+
+def build_rag(normalized: Dict[str, Any]) -> List[Dict[str, Any]]:
+    rag_contexts: List[Dict[str, Any]] = []
+
+    try:
+        from s2n_ai.hybrid_rag_retriever import retrieve_hybrid_context
+
+        try:
+            raw_contexts = retrieve_hybrid_context(normalized, top_k_internal=3, top_k_external=4)
+        except TypeError:
+            try:
+                raw_contexts = retrieve_hybrid_context(finding=normalized, top_k_internal=3, top_k_external=4)
+            except TypeError:
+                raw_contexts = retrieve_hybrid_context(normalized)
+
+        if isinstance(raw_contexts, dict):
+            for key in ("internal", "external", "contexts", "results"):
+                value = raw_contexts.get(key)
+                if isinstance(value, list):
+                    rag_contexts.extend([x for x in value if isinstance(x, dict)])
+        elif isinstance(raw_contexts, list):
+            rag_contexts.extend([x for x in raw_contexts if isinstance(x, dict)])
+
+    except Exception as exc:
+        print(f"[WARN] hybrid RAG retrieval failed. fallback will be used by PDF generator. reason={type(exc).__name__}: {exc}")
+
+    return rag_contexts
+
+
+def generate_outputs(
+    scan_result: Dict[str, Any],
+    output_json: Path,
+    output_normalized: Path,
+    output_pdf: Path,
+) -> None:
+    from s2n_ai.pdf_generator import generate_xss_pdf_report
+
+    findings = scan_result["findings"]
+    first = findings[0]
+
+    normalized = normalize_finding(first)
+    normalized["_all_findings"] = findings
+    normalized["_scan_summary"] = scan_result.get("summary") or {}
+
+    rag_contexts = build_rag(normalized)
+
+    output_json.parent.mkdir(parents=True, exist_ok=True)
+    output_json.write_text(json.dumps(scan_result, ensure_ascii=False, indent=2), encoding="utf-8")
+    output_normalized.write_text(json.dumps(normalized, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    generate_xss_pdf_report(
+        finding=normalized,
+        rag_contexts=rag_contexts,
+        pdf_path=str(output_pdf),
+        all_findings=findings,
+        scan_summary=scan_result.get("summary") or {},
+    )
+
+
+def prompt_if_missing(value: str | None, label: str, required: bool = True) -> str | None:
+    if value:
+        return value
+
+    entered = input(f"{label}: ").strip()
+    if required and not entered:
+        raise SystemExit(f"[ERR] {label} is required.")
+    return entered or None
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="URL input -> direct XSS validation -> normalized finding -> PDF report")
+    parser.add_argument("--url", help="Target URL to scan. If omitted, the script asks interactively.")
+    parser.add_argument("--cookie", help="Optional Cookie header. Example: 'PHPSESSID=...; security=low'")
+    parser.add_argument("--output-pdf", default=str(REPORT_DIR / "url_xss_report.pdf"))
+    parser.add_argument("--timeout", type=int, default=20)
+    args = parser.parse_args()
+
+    print("[S2N URL-to-PDF local test runner]")
+    print("Input: URL")
+    print("Output: reports/generated/url_xss_report.pdf")
+    print("")
+
+    raw_url = prompt_if_missing(args.url, "Target URL", required=True)
+    raw_cookie = args.cookie
+    if raw_cookie is None:
+        raw_cookie = input("Cookie header, optional. Press Enter to skip: ").strip() or None
+
+    assert raw_url is not None
+
+    try:
+        url = _sanitize_url(raw_url)
+        cookie = _sanitize_cookie(raw_cookie)
+    except ValueError as exc:
+        raise SystemExit(f"[ERR] {exc}") from exc
+
+    REPORT_DIR.mkdir(parents=True, exist_ok=True)
+    slug = _safe_filename(_compact_url(url))
+    output_json = REPORT_DIR / f"{slug}_s2n_result.json"
+    output_normalized = REPORT_DIR / f"{slug}_normalized.json"
+    output_pdf = Path(args.output_pdf)
+
+    if not output_pdf.is_absolute():
+        output_pdf = PROJECT_ROOT / output_pdf
+
+    print(f"[1] URL: {url}")
+    print("[2] Direct XSS validation request...")
+    scan_result = direct_xss_scan(url, cookie_header=cookie, timeout=args.timeout)
+
+    print(f"[OK] reflected finding count: {len(scan_result['findings'])}")
+    print("[3] Normalizer/RAG/PDF pipeline...")
+    generate_outputs(scan_result, output_json, output_normalized, output_pdf)
+
+    print(f"[OK] raw scan json: {output_json}")
+    print(f"[OK] normalized json: {output_normalized}")
+    print(f"[OK] PDF report: {output_pdf}")
+    print("")
+    print("Open:")
+    print(f"open {output_pdf}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

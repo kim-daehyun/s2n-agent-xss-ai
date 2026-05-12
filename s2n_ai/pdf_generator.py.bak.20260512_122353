@@ -4,16 +4,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Tuple
 from html import escape
 from datetime import datetime
-from urllib.parse import urlparse, parse_qs
 import re
-from s2n_ai.pdf_vertical_summary_patch import install_vertical_summary_patch
-install_vertical_summary_patch(globals())
-
-
-
-
-
-
 
 
 DEFAULT_PDF_PATH = "reports/generated/dvwa_s2n_xss_report.pdf"
@@ -41,7 +32,7 @@ def _as_list(value: Any) -> List[Any]:
 def _clean_text(value: Any, limit: int | None = None) -> str:
     text = "" if value is None else str(value)
     text = text.replace("\r\n", "\n").replace("\r", "\n").replace("\t", "    ")
-    text = text.replace("\x00", "").replace("■", "").replace("\u00ad", "")
+    text = text.replace("\x00", "").replace("■", "")
     text = re.sub(r"\n{3,}", "\n\n", text)
     text = "\n".join(line.rstrip() for line in text.splitlines()).strip()
     if limit and len(text) > limit:
@@ -81,73 +72,18 @@ def _table(rows: List[Tuple[str, Any]]) -> str:
     return '<table class="kv">' + "\n".join(body) + "</table>"
 
 
-def _display_retriever(value: Any) -> str:
-    raw = _clean_text(value)
-    mapping = {
-        "internal_fallback_after_empty_chromadb_result": "local_security_guide_fallback",
-        "fallback_internal": "local_security_guide_fallback",
-        "chroma": "chroma",
-        "external_web": "external_web",
-        "official_catalog_fallback": "official_catalog_fallback_not_live_web",
-    }
-    return mapping.get(raw, raw or "-")
-
-
-def _display_source_mode(value: Any) -> str:
-    raw = _clean_text(value)
-    mapping = {
-        "official_catalog_fallback_not_live_web": "official_catalog_fallback_not_live_web",
-        "official_catalog_fallback": "official_catalog_fallback_not_live_web",
-        "external_official": "external_official",
-    }
-    return mapping.get(raw, raw or "-")
-
-
-def _compact_url(url: Any) -> str:
-    text = _clean_text(url)
-    if not text:
-        return "-"
-    try:
-        parsed = urlparse(text)
-        if parsed.path:
-            compact = parsed.path
-            if parsed.query:
-                qs = parse_qs(parsed.query)
-                if "name" in qs:
-                    compact += "?name=..."
-                else:
-                    compact += "?..."
-            return compact
-    except Exception:
-        pass
-    return text
-
-
-def _short_payload(payload: Any) -> str:
-    text = _clean_text(payload)
-    if not text:
-        return "-"
-    # 표가 깨지지 않도록 요약표에서는 대표 페이로드만 짧게 표기
-    if "<script>alert(1)</script>" in text:
-        if text.startswith('">'):
-            return '"><script>alert(1)</script>'
-        return "<script>alert(1)</script>"
-    if len(text) > 34:
-        return text[:31] + "..."
-    return text
-
-
-def _code_inline(value: Any) -> str:
-    return f'<code class="inline-code">{escape(_safe(value))}</code>'
-
-
 def _manual_bullets(items: List[Any]) -> str:
     cleaned = [_clean_text(x) for x in items if _clean_text(x)]
     if not cleaned:
         return "<p>-</p>"
     rows = []
     for item in cleaned:
-        rows.append(f'<p class="bullet-line">• {escape(item)}</p>')
+        rows.append(
+            '<div class="manual-row">'
+            '<span class="manual-marker">-</span>'
+            f'<span class="manual-text">{escape(item)}</span>'
+            '</div>'
+        )
     return '<div class="manual-list">' + "\n".join(rows) + "</div>"
 
 
@@ -157,7 +93,12 @@ def _manual_numbers(items: List[Any]) -> str:
         return "<p>-</p>"
     rows = []
     for idx, item in enumerate(cleaned, start=1):
-        rows.append(f'<p class="number-line"><strong>{idx}.</strong> {escape(item)}</p>')
+        rows.append(
+            '<div class="manual-row">'
+            f'<span class="manual-marker">{idx}.</span>'
+            f'<span class="manual-text">{escape(item)}</span>'
+            '</div>'
+        )
     return '<div class="manual-list">' + "\n".join(rows) + "</div>"
 
 
@@ -258,149 +199,27 @@ def _agent(finding: Dict[str, Any], key: str, default: Any = None) -> Any:
     return default
 
 
-def _context_content(ctx: Dict[str, Any]) -> str:
-    return _clean_markdown(
-        ctx.get("content")
-        or ctx.get("text")
-        or ctx.get("page_content")
-        or ctx.get("snippet")
-        or ctx.get("body")
-        or ctx.get("document")
-        or ctx.get("chunk")
-        or "",
-        limit=1700,
-    )
-
-
-def _looks_like_context(ctx: Dict[str, Any]) -> bool:
-    if not isinstance(ctx, dict):
-        return False
-    if _context_content(ctx):
-        return True
-    useful_keys = {"source", "path", "url", "title", "name", "retriever", "score", "similarity"}
-    return any(_clean_text(ctx.get(k)) for k in useful_keys)
-
-
-def _extract_contexts_recursive(raw: Any) -> List[Dict[str, Any]]:
+def _normalize_rag_contexts(raw: Any) -> List[Dict[str, Any]]:
     contexts: List[Dict[str, Any]] = []
 
     if raw is None:
         return contexts
 
-    if isinstance(raw, list) or isinstance(raw, tuple):
-        for item in raw:
-            contexts.extend(_extract_contexts_recursive(item))
-        return contexts
+    if isinstance(raw, dict):
+        if "internal" in raw or "external" in raw:
+            for item in _as_list(raw.get("internal")) + _as_list(raw.get("external")):
+                if isinstance(item, dict):
+                    contexts.append(item)
+            return contexts
+        return [raw]
 
-    if not isinstance(raw, dict):
-        text = _clean_text(raw)
-        return [{"title": "Retrieved Context", "content": text}] if text else []
-
-    docs = raw.get("documents")
-    metas = raw.get("metadatas")
-    distances = raw.get("distances")
-    if docs is not None:
-        doc_items = docs[0] if docs and isinstance(docs, list) and docs and isinstance(docs[0], list) else docs
-        meta_items = metas[0] if metas and isinstance(metas, list) and metas and isinstance(metas[0], list) else metas
-        dist_items = distances[0] if distances and isinstance(distances, list) and distances and isinstance(distances[0], list) else distances
-
-        if isinstance(doc_items, list):
-            for idx, doc in enumerate(doc_items):
-                meta = {}
-                if isinstance(meta_items, list) and idx < len(meta_items) and isinstance(meta_items[idx], dict):
-                    meta = dict(meta_items[idx])
-                score = "-"
-                if isinstance(dist_items, list) and idx < len(dist_items):
-                    score = dist_items[idx]
-                meta.setdefault("content", doc)
-                meta.setdefault("retriever", raw.get("retriever") or "chroma")
-                meta.setdefault("score", score)
-                contexts.append(meta)
-
-    for key in ("internal", "external", "contexts", "rag_contexts", "results", "matches", "items"):
-        if key in raw:
-            contexts.extend(_extract_contexts_recursive(raw.get(key)))
-
-    if _looks_like_context(raw):
-        contexts.append(raw)
+    for item in _as_list(raw):
+        if isinstance(item, dict):
+            contexts.append(item)
+        elif item is not None:
+            contexts.append({"title": "Retrieved Context", "content": str(item)})
 
     return contexts
-
-
-def _normalize_rag_contexts(raw: Any) -> List[Dict[str, Any]]:
-    contexts = _extract_contexts_recursive(raw)
-
-    normalized: List[Dict[str, Any]] = []
-    seen = set()
-    for ctx in contexts:
-        if not isinstance(ctx, dict):
-            continue
-        content = _context_content(ctx)
-        source = _clean_text(ctx.get("source") or ctx.get("path") or ctx.get("url") or "")
-        title = _clean_text(ctx.get("title") or ctx.get("name") or "")
-        retriever = _clean_text(ctx.get("retriever") or "")
-
-        if not content and not source and not title:
-            continue
-
-        key = (title.lower(), source.lower(), content[:180].lower())
-        if key in seen:
-            continue
-        seen.add(key)
-
-        copied = dict(ctx)
-        if content:
-            copied["content"] = content
-        if not copied.get("retriever") and retriever:
-            copied["retriever"] = retriever
-        normalized.append(copied)
-
-    return normalized
-
-
-def _default_internal_contexts() -> List[Dict[str, Any]]:
-    return [
-        {
-            "title": "XSS Remediation Guide",
-            "source": "docs/security_guides/xss_remediation.md",
-            "retriever": "internal_fallback_after_empty_chromadb_result",
-            "score": "fallback",
-            "content": (
-                "Recommended Fix\n"
-                "- Apply context-aware output encoding before rendering user-controlled input.\n"
-                "- Escape HTML body output using HTML entity encoding.\n"
-                "- Escape HTML attribute values before inserting data into attributes.\n"
-                "- Avoid inserting user input directly into JavaScript context.\n"
-                "- Prefer safe DOM APIs such as textContent instead of innerHTML.\n"
-                "- Validate and normalize input on the server side.\n"
-                "- Use Content Security Policy as a defense-in-depth control."
-            ),
-        },
-        {
-            "title": "HTML Body Context Guidance",
-            "source": "docs/security_guides/xss_remediation.md",
-            "retriever": "internal_fallback_after_empty_chromadb_result",
-            "score": "fallback",
-            "content": (
-                "HTML Body Context\n"
-                "When untrusted input is rendered inside the HTML body, apply HTML entity encoding "
-                "before rendering the value. For example, <script>alert(1)</script> should be rendered "
-                "as escaped text rather than interpreted as an executable script."
-            ),
-        },
-        {
-            "title": "Reflected XSS Explanation",
-            "source": "docs/security_guides/xss_remediation.md",
-            "retriever": "internal_fallback_after_empty_chromadb_result",
-            "score": "fallback",
-            "content": (
-                "Reflected XSS\n"
-                "Reflected XSS occurs when user-controlled input is included in an HTTP response "
-                "without proper output encoding. If the browser interprets the reflected input as "
-                "HTML or JavaScript, an attacker may execute script in the victim's browser context."
-            ),
-        },
-    ]
 
 
 def _context_source_type(ctx: Dict[str, Any]) -> str:
@@ -415,6 +234,18 @@ def _context_source_type(ctx: Dict[str, Any]) -> str:
     if any(x in source for x in ("owasp.org", "cwe.mitre.org", "developer.mozilla.org", "portswigger.net")):
         return "external"
     return "internal"
+
+
+def _context_content(ctx: Dict[str, Any]) -> str:
+    return _clean_markdown(
+        ctx.get("content")
+        or ctx.get("text")
+        or ctx.get("page_content")
+        or ctx.get("snippet")
+        or ctx.get("body")
+        or "",
+        limit=1700,
+    )
 
 
 def _context_title(ctx: Dict[str, Any], index: int) -> str:
@@ -482,7 +313,7 @@ def _official_refs_from_finding(finding: Dict[str, Any], external_contexts: List
             refs.append({
                 "title": ctx.get("title") or ctx.get("name") or "External Official Reference",
                 "source": ctx.get("source") or ctx.get("url") or ctx.get("path") or "-",
-                "source_mode": _display_source_mode(ctx.get("retriever") or "external_official"),
+                "source_mode": ctx.get("retriever") or "external_official",
                 "score": ctx.get("score") or ctx.get("similarity") or "-",
                 "summary": _context_content(ctx),
             })
@@ -525,21 +356,11 @@ def _official_refs_from_finding(finding: Dict[str, Any], external_contexts: List
 
 
 def _render_internal_contexts(contexts: List[Dict[str, Any]]) -> str:
-    usable = []
-    for ctx in contexts:
-        if not isinstance(ctx, dict):
-            continue
-        content = _context_content(ctx)
-        source = _clean_text(ctx.get("source") or ctx.get("path") or ctx.get("url") or "")
-        title = _clean_text(ctx.get("title") or ctx.get("name") or "")
-        if content or source or title:
-            usable.append(ctx)
-
-    if not usable:
-        usable = _default_internal_contexts()
+    if not contexts:
+        return "<p>No internal knowledge context was retrieved.</p>"
 
     parts = []
-    for idx, ctx in enumerate(_dedupe_contexts(usable, limit=3), start=1):
+    for idx, ctx in enumerate(_dedupe_contexts(contexts, limit=3), start=1):
         title = ctx.get("_render_title") or _context_title(ctx, idx)
         content = ctx.get("_render_content") or _context_content(ctx)
 
@@ -548,7 +369,7 @@ def _render_internal_contexts(contexts: List[Dict[str, Any]]) -> str:
           <h3>7.{idx} {escape(title)}</h3>
           {_table([
               ("Source", ctx.get("source") or ctx.get("path") or "-"),
-              ("Retriever", _display_retriever(ctx.get("retriever"))),
+              ("Retriever", ctx.get("retriever") or "-"),
               ("Retrieval Score", ctx.get("score") or ctx.get("similarity") or "-"),
           ])}
           <div class="context-text">{_paragraphs(content)}</div>
@@ -568,7 +389,7 @@ def _render_external_refs(refs: List[Dict[str, Any]]) -> str:
           <h3>8.{idx} {escape(_safe(ref.get("title")))}</h3>
           {_table([
               ("Source", ref.get("source") or "-"),
-              ("Source Mode", _display_source_mode(ref.get("source_mode") or "-")),
+              ("Source Mode", ref.get("source_mode") or "-"),
               ("Score", ref.get("score") or "-"),
           ])}
           <p>{escape(_clean_text(ref.get("summary"), limit=900))}</p>
@@ -598,30 +419,37 @@ def _finding_summary_table(findings: List[Dict[str, Any]]) -> str:
     if not findings:
         return "<p>No finding summary available.</p>"
 
-    sections = []
-    for idx, f in enumerate(findings, start=1):
+    rows = []
+    for f in findings:
         evidence = f.get("evidence") or ""
         reflected = _evidence_get(evidence, "reflection", f.get("reflected", "-"))
         verification = _evidence_get(evidence, "verification", f.get("verification", "-"))
-        url = f.get("url") or f.get("target_url") or "-"
+        rows.append(
+            "<tr>"
+            f"<td>{_html(f.get('id') or f.get('finding_id') or '-')}</td>"
+            f"<td>{_html(f.get('severity') or '-')}</td>"
+            f"<td>{_html(f.get('confidence') or '-')}</td>"
+            f"<td>{_html(f.get('url') or f.get('target_url') or '-')}</td>"
+            f"<td>{_html(f.get('parameter') or '-')}</td>"
+            f"<td>{_html(f.get('payload') or '-')}</td>"
+            f"<td>{_html(verification)}</td>"
+            f"<td>{_html(reflected)}</td>"
+            "</tr>"
+        )
 
-        sections.append(f"""
-        <section class="finding-summary-item">
-          <h3>2.{idx} Finding {idx}</h3>
-          {_table([
-              ("ID", f.get("id") or f.get("finding_id") or "-"),
-              ("Severity", f.get("severity") or "-"),
-              ("Confidence", f.get("confidence") or "-"),
-              ("Target Path", _compact_url(url)),
-              ("Parameter", f.get("parameter") or "-"),
-              ("Payload", f.get("payload") or "-"),
-              ("Verification", verification),
-              ("Reflected", reflected),
-          ])}
-        </section>
-        """)
-
-    return '<div class="finding-summary-vertical">' + "\n".join(sections) + "</div>"
+    return """
+    <table class="finding-summary">
+      <thead>
+        <tr>
+          <th>ID</th><th>Severity</th><th>Confidence</th><th>URL</th>
+          <th>Param</th><th>Payload</th><th>Verification</th><th>Reflected</th>
+        </tr>
+      </thead>
+      <tbody>
+    """ + "\n".join(rows) + """
+      </tbody>
+    </table>
+    """
 
 
 def _css() -> str:
@@ -729,46 +557,27 @@ def _css() -> str:
       overflow-wrap: anywhere;
     }
 
-    .finding-summary-vertical {
+    table.finding-summary {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+      font-size: 7.6pt;
       margin: 7pt 0 10pt 0;
     }
 
-    .finding-summary-item {
-      margin: 0 0 12pt 0;
-      break-inside: avoid;
-      page-break-inside: avoid;
+    table.finding-summary th {
+      background: #e5e7eb;
+      border: 1px solid #d1d5db;
+      padding: 5pt;
+      text-align: left;
     }
 
-    .finding-summary-item h3 {
-      font-size: 11pt;
-      margin: 0 0 6pt 0;
-    }
-
-    .finding-summary-item table.kv {
-      margin-top: 0;
-      font-size: 8.6pt;
-    }
-
-    .finding-summary-item table.kv th {
-      width: 24%;
-    }
-
-    .finding-summary-item table.kv td {
+    table.finding-summary td {
+      border: 1px solid #d1d5db;
+      padding: 5pt;
+      vertical-align: top;
       word-break: break-word;
       overflow-wrap: anywhere;
-    }
-
-    .inline-code {
-      display: inline-block;
-      background: #f3f4f6;
-      padding: 1pt 3pt;
-      border-radius: 3px;
-      font-family: Menlo, Consolas, monospace;
-      font-size: 7pt;
-      line-height: 1.15;
-      word-break: normal;
-      overflow-wrap: normal;
-      white-space: nowrap;
     }
 
     pre {
@@ -789,12 +598,29 @@ def _css() -> str:
       margin: 5pt 0 8pt 0;
     }
 
-    .bullet-line,
-    .number-line {
-      margin: 3pt 0 3pt 0;
-      padding-left: 0;
-      text-indent: 0;
-      line-height: 1.35;
+    .manual-row {
+      display: block;
+      margin: 3pt 0;
+      padding-left: 20pt;
+      text-indent: -20pt;
+    }
+
+    .manual-marker {
+      display: inline-block;
+      width: 20pt;
+      font-weight: 700;
+    }
+
+    .manual-text {
+      display: inline;
+    }
+
+    code {
+      background: #f3f4f6;
+      padding: 1pt 3pt;
+      border-radius: 3px;
+      font-family: Menlo, Consolas, monospace;
+      font-size: 8.8pt;
     }
     """
 
@@ -840,7 +666,7 @@ def generate_xss_pdf_report(
     if isinstance(evidence, str) and ("www-comm" in evidence or evidence.endswith("comm") or evidence.endswith("co")):
         evidence_note = """
         <div class="notice">
-          Note: the original S2N finding stores a truncated response snippet. The report preserves the scanner provided
+          Note: the original S2N finding stores a truncated response snippet. The report preserves the scanner-provided
           evidence and only adds a renderer truncation marker when the report renderer itself cuts long text.
         </div>
         """
@@ -858,7 +684,7 @@ def generate_xss_pdf_report(
     <p class="muted">Generated at: {escape(datetime.utcnow().isoformat())}Z</p>
 
     <h2>1. Executive Summary</h2>
-    <p>This report was generated from an actual S2N scan result and describes confirmed XSS findings.</p>
+    <p>This report was generated from an actual S2N scan result and describes confirmed reflected XSS findings.</p>
     {_table([
         ("Primary Finding", title),
         ("Primary Severity", severity),
@@ -873,13 +699,13 @@ def generate_xss_pdf_report(
         ("Source Plugin", finding.get("source_plugin") or "xss"),
     ])}
     <div class="okbox">
-      The finding is confirmed because the scanner observed unsafe payload handling through HTTP reflection or browser execution evidence.
+      The finding is confirmed because the submitted payload was reflected in an HTTP response without clear output encoding.
     </div>
   </section>
 
   <section class="page">
     <h2>2. All Findings Summary</h2>
-    <p>The S2N scan detected the following XSS finding records. The following sections summarize each finding in a vertical detail format and then analyze the primary finding.</p>
+    <p>The S2N scan detected the following XSS finding records. The following sections analyze the first finding as the representative case.</p>
     {_finding_summary_table(findings)}
   </section>
 
@@ -942,8 +768,8 @@ def generate_xss_pdf_report(
 
     <h3>Scoring Basis</h3>
     {_manual_bullets([
-        "Severity is high because browser-executable JavaScript was confirmed by scanner evidence.",
-        "Confidence is firm because the payload and execution/reflection evidence were verified by the scanner.",
+        "Severity is high because browser-executable JavaScript was reflected in the response.",
+        "Confidence is firm because the payload and reflected value were verified in the HTTP response.",
         "Likelihood is high when user-controlled input is returned without context-aware output encoding.",
         "Impact is high because reflected script execution can lead to session theft, user action abuse, or page manipulation.",
     ])}
@@ -966,7 +792,12 @@ def generate_xss_pdf_report(
 
   <section class="page">
     <h2>8. Official Reference Mapping</h2>
-{_render_external_refs(official_refs)}
+    <div class="notice">
+      This section is not claiming live external web RAG. It is an official reference mapping generated from
+      normalized finding hints. If a live external retriever is later connected, its results should be inserted
+      as external_official RAG contexts.
+    </div>
+    {_render_external_refs(official_refs)}
   </section>
 
   <section class="page">
@@ -1007,5 +838,3 @@ def generate_xss_pdf_report(
 
 generate_pdf_report = generate_xss_pdf_report
 generate_pdf = generate_xss_pdf_report
-
-

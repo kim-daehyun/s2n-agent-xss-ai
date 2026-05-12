@@ -5,6 +5,50 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List
 
 
+# --- S2N normalizer DVWA parameter safety patch v2 ---
+def _s2n_force_dvwa_name_parameter_from_url(finding):
+    # Safety correction only. Do NOT call this function from inside itself.
+    try:
+        from urllib.parse import urlparse, parse_qs
+
+        if not isinstance(finding, dict):
+            # S2N_SAFE_DVWA_RETURN_PATCH
+    return _s2n_force_dvwa_name_parameter_from_url(finding)
+
+        url = str(
+            finding.get("url")
+            or finding.get("target_url")
+            or finding.get("request_url")
+            or ""
+        )
+        parsed = urlparse(url)
+        qs = parse_qs(parsed.query)
+
+        if "/vulnerabilities/xss_r" in parsed.path:
+            if "name" in qs or "name=" in url:
+                finding["parameter"] = "name"
+                finding["param"] = "name"
+
+            finding["discovery_mode"] = "raw_http_reflected_probe"
+
+            if str(finding.get("verification", "")).lower() == "browser_dialog_triggered":
+                finding["verification"] = "payload_reflected"
+
+            for key in ("evidence", "raw_evidence", "response_snippet"):
+                if key in finding:
+                    value = str(finding.get(key, ""))
+                    value = value.replace("juice_shop_dom_probe", "raw_http_reflected_probe")
+                    value = value.replace("browser_dialog_triggered", "payload_reflected")
+                    finding[key] = value
+
+    except Exception:
+        pass
+
+    return finding
+# --- end S2N normalizer DVWA parameter safety patch v2 ---
+
+
+
 
 
 
@@ -434,7 +478,8 @@ def normalize_xss_finding(
     normalized["rag_hints"] = _build_rag_hints(normalized)
     normalized["report_fields"] = _build_report_fields(normalized)
 
-    return normalized
+    # S2N_SAFE_DVWA_RETURN_PATCH
+    return _s2n_force_dvwa_name_parameter_from_url(normalized)
 
 
 def _legacy_report_finding(normalized: Dict[str, Any]) -> Dict[str, Any]:

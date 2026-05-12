@@ -6,14 +6,6 @@ from html import escape
 from datetime import datetime
 from urllib.parse import urlparse, parse_qs
 import re
-from s2n_ai.pdf_vertical_summary_patch import install_vertical_summary_patch
-install_vertical_summary_patch(globals())
-
-
-
-
-
-
 
 
 DEFAULT_PDF_PATH = "reports/generated/dvwa_s2n_xss_report.pdf"
@@ -81,28 +73,6 @@ def _table(rows: List[Tuple[str, Any]]) -> str:
     return '<table class="kv">' + "\n".join(body) + "</table>"
 
 
-def _display_retriever(value: Any) -> str:
-    raw = _clean_text(value)
-    mapping = {
-        "internal_fallback_after_empty_chromadb_result": "local_security_guide_fallback",
-        "fallback_internal": "local_security_guide_fallback",
-        "chroma": "chroma",
-        "external_web": "external_web",
-        "official_catalog_fallback": "official_catalog_fallback_not_live_web",
-    }
-    return mapping.get(raw, raw or "-")
-
-
-def _display_source_mode(value: Any) -> str:
-    raw = _clean_text(value)
-    mapping = {
-        "official_catalog_fallback_not_live_web": "official_catalog_fallback_not_live_web",
-        "official_catalog_fallback": "official_catalog_fallback_not_live_web",
-        "external_official": "external_official",
-    }
-    return mapping.get(raw, raw or "-")
-
-
 def _compact_url(url: Any) -> str:
     text = _clean_text(url)
     if not text:
@@ -121,24 +91,6 @@ def _compact_url(url: Any) -> str:
     except Exception:
         pass
     return text
-
-
-def _short_payload(payload: Any) -> str:
-    text = _clean_text(payload)
-    if not text:
-        return "-"
-    # 표가 깨지지 않도록 요약표에서는 대표 페이로드만 짧게 표기
-    if "<script>alert(1)</script>" in text:
-        if text.startswith('">'):
-            return '"><script>alert(1)</script>'
-        return "<script>alert(1)</script>"
-    if len(text) > 34:
-        return text[:31] + "..."
-    return text
-
-
-def _code_inline(value: Any) -> str:
-    return f'<code class="inline-code">{escape(_safe(value))}</code>'
 
 
 def _manual_bullets(items: List[Any]) -> str:
@@ -482,7 +434,7 @@ def _official_refs_from_finding(finding: Dict[str, Any], external_contexts: List
             refs.append({
                 "title": ctx.get("title") or ctx.get("name") or "External Official Reference",
                 "source": ctx.get("source") or ctx.get("url") or ctx.get("path") or "-",
-                "source_mode": _display_source_mode(ctx.get("retriever") or "external_official"),
+                "source_mode": ctx.get("retriever") or "external_official",
                 "score": ctx.get("score") or ctx.get("similarity") or "-",
                 "summary": _context_content(ctx),
             })
@@ -548,7 +500,7 @@ def _render_internal_contexts(contexts: List[Dict[str, Any]]) -> str:
           <h3>7.{idx} {escape(title)}</h3>
           {_table([
               ("Source", ctx.get("source") or ctx.get("path") or "-"),
-              ("Retriever", _display_retriever(ctx.get("retriever"))),
+              ("Retriever", ctx.get("retriever") or "-"),
               ("Retrieval Score", ctx.get("score") or ctx.get("similarity") or "-"),
           ])}
           <div class="context-text">{_paragraphs(content)}</div>
@@ -568,7 +520,7 @@ def _render_external_refs(refs: List[Dict[str, Any]]) -> str:
           <h3>8.{idx} {escape(_safe(ref.get("title")))}</h3>
           {_table([
               ("Source", ref.get("source") or "-"),
-              ("Source Mode", _display_source_mode(ref.get("source_mode") or "-")),
+              ("Source Mode", ref.get("source_mode") or "-"),
               ("Score", ref.get("score") or "-"),
           ])}
           <p>{escape(_clean_text(ref.get("summary"), limit=900))}</p>
@@ -598,30 +550,38 @@ def _finding_summary_table(findings: List[Dict[str, Any]]) -> str:
     if not findings:
         return "<p>No finding summary available.</p>"
 
-    sections = []
-    for idx, f in enumerate(findings, start=1):
+    rows = []
+    for f in findings:
         evidence = f.get("evidence") or ""
         reflected = _evidence_get(evidence, "reflection", f.get("reflected", "-"))
         verification = _evidence_get(evidence, "verification", f.get("verification", "-"))
         url = f.get("url") or f.get("target_url") or "-"
+        rows.append(
+            "<tr>"
+            f"<td>{_html(f.get('id') or f.get('finding_id') or '-')}</td>"
+            f"<td>{_html(f.get('severity') or '-')}</td>"
+            f"<td>{_html(f.get('confidence') or '-')}</td>"
+            f"<td>{_html(_compact_url(url))}</td>"
+            f"<td>{_html(f.get('parameter') or '-')}</td>"
+            f"<td>{_html(f.get('payload') or '-')}</td>"
+            f"<td>{_html(verification)}</td>"
+            f"<td>{_html(reflected)}</td>"
+            "</tr>"
+        )
 
-        sections.append(f"""
-        <section class="finding-summary-item">
-          <h3>2.{idx} Finding {idx}</h3>
-          {_table([
-              ("ID", f.get("id") or f.get("finding_id") or "-"),
-              ("Severity", f.get("severity") or "-"),
-              ("Confidence", f.get("confidence") or "-"),
-              ("Target Path", _compact_url(url)),
-              ("Parameter", f.get("parameter") or "-"),
-              ("Payload", f.get("payload") or "-"),
-              ("Verification", verification),
-              ("Reflected", reflected),
-          ])}
-        </section>
-        """)
-
-    return '<div class="finding-summary-vertical">' + "\n".join(sections) + "</div>"
+    return """
+    <table class="finding-summary">
+      <thead>
+        <tr>
+          <th>ID</th><th>Severity</th><th>Confidence</th><th>Target Path</th>
+          <th>Param</th><th>Payload</th><th>Verification</th><th>Reflected</th>
+        </tr>
+      </thead>
+      <tbody>
+    """ + "\n".join(rows) + """
+      </tbody>
+    </table>
+    """
 
 
 def _css() -> str:
@@ -729,46 +689,58 @@ def _css() -> str:
       overflow-wrap: anywhere;
     }
 
-    .finding-summary-vertical {
+    table.finding-summary {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+      font-size: 8pt;
       margin: 7pt 0 10pt 0;
     }
 
-    .finding-summary-item {
-      margin: 0 0 12pt 0;
-      break-inside: avoid;
-      page-break-inside: avoid;
+    table.finding-summary th {
+      background: #e5e7eb;
+      border: 1px solid #d1d5db;
+      padding: 5pt;
+      text-align: left;
     }
 
-    .finding-summary-item h3 {
-      font-size: 11pt;
-      margin: 0 0 6pt 0;
-    }
-
-    .finding-summary-item table.kv {
-      margin-top: 0;
-      font-size: 8.6pt;
-    }
-
-    .finding-summary-item table.kv th {
-      width: 24%;
-    }
-
-    .finding-summary-item table.kv td {
+    table.finding-summary td {
+      border: 1px solid #d1d5db;
+      padding: 5pt;
+      vertical-align: top;
       word-break: break-word;
       overflow-wrap: anywhere;
     }
 
-    .inline-code {
-      display: inline-block;
-      background: #f3f4f6;
-      padding: 1pt 3pt;
-      border-radius: 3px;
-      font-family: Menlo, Consolas, monospace;
-      font-size: 7pt;
-      line-height: 1.15;
-      word-break: normal;
-      overflow-wrap: normal;
-      white-space: nowrap;
+    table.finding-summary th:nth-child(1),
+    table.finding-summary td:nth-child(1) {
+      width: 8%;
+    }
+
+    table.finding-summary th:nth-child(2),
+    table.finding-summary td:nth-child(2),
+    table.finding-summary th:nth-child(3),
+    table.finding-summary td:nth-child(3),
+    table.finding-summary th:nth-child(5),
+    table.finding-summary td:nth-child(5),
+    table.finding-summary th:nth-child(8),
+    table.finding-summary td:nth-child(8) {
+      width: 10%;
+    }
+
+    table.finding-summary th:nth-child(4),
+    table.finding-summary td:nth-child(4) {
+      width: 18%;
+    }
+
+    table.finding-summary th:nth-child(6),
+    table.finding-summary td:nth-child(6) {
+      width: 18%;
+    }
+
+    table.finding-summary th:nth-child(7),
+    table.finding-summary td:nth-child(7) {
+      width: 16%;
     }
 
     pre {
@@ -795,6 +767,14 @@ def _css() -> str:
       padding-left: 0;
       text-indent: 0;
       line-height: 1.35;
+    }
+
+    code {
+      background: #f3f4f6;
+      padding: 1pt 3pt;
+      border-radius: 3px;
+      font-family: Menlo, Consolas, monospace;
+      font-size: 8.8pt;
     }
     """
 
@@ -858,7 +838,7 @@ def generate_xss_pdf_report(
     <p class="muted">Generated at: {escape(datetime.utcnow().isoformat())}Z</p>
 
     <h2>1. Executive Summary</h2>
-    <p>This report was generated from an actual S2N scan result and describes confirmed XSS findings.</p>
+    <p>This report was generated from an actual S2N scan result and describes confirmed reflected XSS findings.</p>
     {_table([
         ("Primary Finding", title),
         ("Primary Severity", severity),
@@ -873,13 +853,13 @@ def generate_xss_pdf_report(
         ("Source Plugin", finding.get("source_plugin") or "xss"),
     ])}
     <div class="okbox">
-      The finding is confirmed because the scanner observed unsafe payload handling through HTTP reflection or browser execution evidence.
+      The finding is confirmed because the submitted payload was reflected in an HTTP response without clear output encoding.
     </div>
   </section>
 
   <section class="page">
     <h2>2. All Findings Summary</h2>
-    <p>The S2N scan detected the following XSS finding records. The following sections summarize each finding in a vertical detail format and then analyze the primary finding.</p>
+    <p>The S2N scan detected the following XSS finding records. The following sections analyze the first finding as the representative case.</p>
     {_finding_summary_table(findings)}
   </section>
 
@@ -942,8 +922,8 @@ def generate_xss_pdf_report(
 
     <h3>Scoring Basis</h3>
     {_manual_bullets([
-        "Severity is high because browser-executable JavaScript was confirmed by scanner evidence.",
-        "Confidence is firm because the payload and execution/reflection evidence were verified by the scanner.",
+        "Severity is high because browser-executable JavaScript was reflected in the response.",
+        "Confidence is firm because the payload and reflected value were verified in the HTTP response.",
         "Likelihood is high when user-controlled input is returned without context-aware output encoding.",
         "Impact is high because reflected script execution can lead to session theft, user action abuse, or page manipulation.",
     ])}
@@ -966,7 +946,12 @@ def generate_xss_pdf_report(
 
   <section class="page">
     <h2>8. Official Reference Mapping</h2>
-{_render_external_refs(official_refs)}
+    <div class="notice">
+      This section is not claiming live external web RAG. It is an official reference mapping generated from
+      normalized finding hints. If a live external retriever is later connected, its results should be inserted
+      as external_official RAG contexts.
+    </div>
+    {_render_external_refs(official_refs)}
   </section>
 
   <section class="page">
@@ -1007,5 +992,3 @@ def generate_xss_pdf_report(
 
 generate_pdf_report = generate_xss_pdf_report
 generate_pdf = generate_xss_pdf_report
-
-

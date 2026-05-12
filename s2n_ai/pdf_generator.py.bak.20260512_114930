@@ -1,0 +1,696 @@
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Any, Dict, List, Tuple, Optional
+from html import escape
+from datetime import datetime
+import re
+
+try:
+    from reportlab.lib import colors
+    from reportlab.lib.enums import TA_LEFT
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import mm
+    from reportlab.platypus import (
+        SimpleDocTemplate,
+        Paragraph,
+        Spacer,
+        Table,
+        TableStyle,
+        PageBreak,
+        Preformatted,
+    )
+except Exception as exc:  # pragma: no cover
+    raise ImportError(
+        "reportlab is required for PDF generation. Install with: pip install reportlab"
+    ) from exc
+
+
+DEFAULT_PDF_PATH = "reports/generated/dvwa_s2n_xss_report.pdf"
+
+
+OFFICIAL_REFERENCE_CATALOG: Dict[str, Dict[str, str]] = {
+    "OWASP XSS Prevention Cheat Sheet": {
+        "title": "OWASP Cross Site Scripting Prevention Cheat Sheet",
+        "source": "https://cheatsheetseries.owasp.org/cheatsheets/Cross_Site_Scripting_Prevention_Cheat_Sheet.html",
+        "summary": (
+            "OWASP recommends context-aware output encoding, safe HTML handling, "
+            "strict input validation, and CSP as defense-in-depth for XSS prevention."
+        ),
+    },
+    "OWASP": {
+        "title": "OWASP Cross Site Scripting Prevention Cheat Sheet",
+        "source": "https://cheatsheetseries.owasp.org/cheatsheets/Cross_Site_Scripting_Prevention_Cheat_Sheet.html",
+        "summary": (
+            "OWASP recommends context-aware output encoding, safe HTML handling, "
+            "strict input validation, and CSP as defense-in-depth for XSS prevention."
+        ),
+    },
+    "CWE-79": {
+        "title": "CWE-79: Improper Neutralization of Input During Web Page Generation",
+        "source": "https://cwe.mitre.org/data/definitions/79.html",
+        "summary": (
+            "CWE-79 describes XSS as improper neutralization of user-controlled input "
+            "during web page generation, allowing script execution in a user's browser."
+        ),
+    },
+    "MDN XSS": {
+        "title": "MDN Web Docs: Cross-site scripting",
+        "source": "https://developer.mozilla.org/en-US/docs/Web/Security/Attacks/XSS",
+        "summary": (
+            "MDN explains XSS attack patterns and recommends output encoding, "
+            "safe DOM APIs, sanitization, and CSP to reduce script injection risk."
+        ),
+    },
+    "MDN": {
+        "title": "MDN Web Docs: Cross-site scripting",
+        "source": "https://developer.mozilla.org/en-US/docs/Web/Security/Attacks/XSS",
+        "summary": (
+            "MDN explains XSS attack patterns and recommends output encoding, "
+            "safe DOM APIs, sanitization, and CSP to reduce script injection risk."
+        ),
+    },
+    "PortSwigger Reflected XSS": {
+        "title": "PortSwigger Web Security Academy: Reflected XSS",
+        "source": "https://portswigger.net/web-security/cross-site-scripting/reflected",
+        "summary": (
+            "PortSwigger describes reflected XSS as user input immediately returned "
+            "in an unsafe HTTP response and recommends context-specific validation and encoding."
+        ),
+    },
+    "PortSwigger": {
+        "title": "PortSwigger Web Security Academy: Reflected XSS",
+        "source": "https://portswigger.net/web-security/cross-site-scripting/reflected",
+        "summary": (
+            "PortSwigger describes reflected XSS as user input immediately returned "
+            "in an unsafe HTTP response and recommends context-specific validation and encoding."
+        ),
+    },
+}
+
+
+RECOMMENDED_DOC_TO_REFERENCE_KEY = {
+    "xss_remediation": "OWASP XSS Prevention Cheat Sheet",
+    "output_encoding": "OWASP XSS Prevention Cheat Sheet",
+    "content_security_policy": "MDN XSS",
+    "cwe_79": "CWE-79",
+    "reflected_xss": "PortSwigger Reflected XSS",
+}
+
+
+def _safe(value: Any, default: str = "-") -> str:
+    if value is None or value == "":
+        return default
+    return str(value)
+
+
+def _as_dict(value: Any) -> Dict[str, Any]:
+    return value if isinstance(value, dict) else {}
+
+
+def _as_list(value: Any) -> List[Any]:
+    if value is None:
+        return []
+    if isinstance(value, list):
+        return value
+    return [value]
+
+
+def _truthy_text(value: Any) -> str:
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    return _safe(value)
+
+
+def _truncate(value: Any, limit: int = 1600) -> str:
+    text = _safe(value, "")
+    if len(text) <= limit:
+        return text
+    return text[:limit] + "\n... (truncated)"
+
+
+def _html(value: Any) -> str:
+    return escape(_safe(value))
+
+
+def _evidence_get(evidence: Any, key: str, default: Any = None) -> Any:
+    if isinstance(evidence, dict):
+        return evidence.get(key, default)
+
+    text = "" if evidence is None else str(evidence)
+    lower = text.lower()
+
+    if key in ("reflection", "reflected", "reflection_detected"):
+        markers = [
+            "reflected in http response",
+            "payload reflected",
+            "payload already present",
+            "direct_url_payload_reflected",
+            "verification=payload_reflected",
+            "verification=direct_url_payload_reflected",
+            "without clear output encoding",
+            "reflected_value=",
+            "was reflected",
+        ]
+        return any(marker in lower for marker in markers)
+
+    if key in ("reflected_value", "payload"):
+        for marker in ("reflected_value=", "payload="):
+            if marker in text:
+                return text.split(marker, 1)[1].split(";", 1)[0].strip()
+        return default
+
+    if key in ("verification", "verified"):
+        if "direct_url_payload_reflected" in text:
+            return "direct_url_payload_reflected"
+        if "verification=payload_reflected" in text or "payload reflected" in lower:
+            return "payload_reflected"
+        if "reflected in http response" in lower:
+            return "payload_reflected"
+        return default
+
+    if key in ("snippet", "response_snippet", "body", "raw"):
+        return text if text else default
+
+    return default
+
+
+def _extract_reflection_info(finding: Dict[str, Any]) -> Dict[str, Any]:
+    direct = _as_dict(finding.get("reflection_detected"))
+    if direct:
+        return direct
+
+    evidence = finding.get("evidence")
+    payload = finding.get("payload")
+    return {
+        "detected": _evidence_get(evidence, "reflection", False),
+        "reflected_value": _evidence_get(evidence, "reflected_value", payload or "-"),
+        "verification": _evidence_get(evidence, "verification", "payload_reflected"),
+        "encoded": False,
+    }
+
+
+def _get_agent_response(finding: Dict[str, Any]) -> Dict[str, Any]:
+    agent = _as_dict(finding.get("agent_response"))
+    if agent:
+        return agent
+
+    # fallback: some normalizers flatten these fields at top-level
+    keys = [
+        "task",
+        "should_run",
+        "context_known",
+        "fallback",
+        "reason",
+        "selected_plugin",
+        "severity",
+        "confidence",
+    ]
+    return {k: finding.get(k) for k in keys if k in finding}
+
+
+def _get_rag_hints(finding: Dict[str, Any]) -> Dict[str, Any]:
+    hints = _as_dict(finding.get("rag_hints"))
+    if hints:
+        return hints
+
+    hints = {}
+    for key in ("official_references", "recommended_docs", "query", "rag_query"):
+        if key in finding:
+            hints[key] = finding.get(key)
+    return hints
+
+
+def _normalize_official_reference_key(value: Any) -> Optional[str]:
+    text = _safe(value, "").strip()
+    if not text:
+        return None
+
+    lowered = text.lower()
+    if "owasp" in lowered or "output encoding" in lowered or "xss prevention" in lowered:
+        return "OWASP XSS Prevention Cheat Sheet"
+    if "cwe-79" in lowered or "cwe 79" in lowered or "definitions/79" in lowered:
+        return "CWE-79"
+    if "mdn" in lowered or "mozilla" in lowered:
+        return "MDN XSS"
+    if "portswigger" in lowered or "reflected xss" in lowered:
+        return "PortSwigger Reflected XSS"
+    return text if text in OFFICIAL_REFERENCE_CATALOG else None
+
+
+def _is_external_context(ctx: Dict[str, Any]) -> bool:
+    source_type = _safe(ctx.get("source_type"), "").lower()
+    retriever = _safe(ctx.get("retriever"), "").lower()
+    source = _safe(ctx.get("source") or ctx.get("path"), "").lower()
+
+    return (
+        "external" in source_type
+        or "official" in retriever
+        or "owasp" in source
+        or "cwe.mitre" in source
+        or "developer.mozilla" in source
+        or "mozilla" in source
+        or "portswigger" in source
+    )
+
+
+def _split_contexts(rag_contexts: List[Dict[str, Any]]) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+    internal: List[Dict[str, Any]] = []
+    external: List[Dict[str, Any]] = []
+
+    for ctx in rag_contexts:
+        if not isinstance(ctx, dict):
+            continue
+        if _is_external_context(ctx):
+            external.append(ctx)
+        else:
+            internal.append(ctx)
+
+    return internal, external
+
+
+def _build_external_reference_fallback(finding: Dict[str, Any]) -> List[Dict[str, Any]]:
+    hints = _get_rag_hints(finding)
+    raw_candidates: List[Any] = []
+
+    raw_candidates.extend(_as_list(hints.get("official_references")))
+    raw_candidates.extend(_as_list(finding.get("official_references")))
+
+    for doc in _as_list(hints.get("recommended_docs")) + _as_list(finding.get("recommended_docs")):
+        mapped = RECOMMENDED_DOC_TO_REFERENCE_KEY.get(_safe(doc, ""))
+        if mapped:
+            raw_candidates.append(mapped)
+
+    # For XSS findings, add a sane default official reference set if no hint exists.
+    vuln_type = _safe(finding.get("vuln_type") or finding.get("vulnerability_type") or finding.get("source_plugin"), "").lower()
+    if not raw_candidates and "xss" in vuln_type:
+        raw_candidates.extend([
+            "OWASP XSS Prevention Cheat Sheet",
+            "CWE-79",
+            "MDN XSS",
+            "PortSwigger Reflected XSS",
+        ])
+
+    refs: List[Dict[str, Any]] = []
+    seen = set()
+
+    for item in raw_candidates:
+        key = _normalize_official_reference_key(item)
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        catalog_item = OFFICIAL_REFERENCE_CATALOG.get(key)
+        if catalog_item:
+            refs.append(
+                {
+                    "title": catalog_item["title"],
+                    "source": catalog_item["source"],
+                    "source_type": "external_official_catalog_fallback",
+                    "retriever": "official_catalog_fallback",
+                    "score": "fallback",
+                    "content": catalog_item["summary"],
+                }
+            )
+
+    return refs
+
+
+def _styles() -> Dict[str, ParagraphStyle]:
+    base = getSampleStyleSheet()
+    styles: Dict[str, ParagraphStyle] = {}
+    styles["title"] = ParagraphStyle(
+        "S2NTitle",
+        parent=base["Title"],
+        fontName="Helvetica-Bold",
+        fontSize=24,
+        leading=30,
+        textColor=colors.HexColor("#111827"),
+        spaceAfter=14,
+    )
+    styles["h1"] = ParagraphStyle(
+        "S2NH1",
+        parent=base["Heading1"],
+        fontName="Helvetica-Bold",
+        fontSize=18,
+        leading=23,
+        textColor=colors.HexColor("#111827"),
+        spaceBefore=14,
+        spaceAfter=8,
+    )
+    styles["h2"] = ParagraphStyle(
+        "S2NH2",
+        parent=base["Heading2"],
+        fontName="Helvetica-Bold",
+        fontSize=13,
+        leading=17,
+        textColor=colors.HexColor("#111827"),
+        spaceBefore=10,
+        spaceAfter=6,
+    )
+    styles["body"] = ParagraphStyle(
+        "S2NBody",
+        parent=base["BodyText"],
+        fontName="Helvetica",
+        fontSize=9.5,
+        leading=13,
+        textColor=colors.HexColor("#111827"),
+        spaceAfter=6,
+    )
+    styles["small"] = ParagraphStyle(
+        "S2NSmall",
+        parent=base["BodyText"],
+        fontName="Helvetica",
+        fontSize=8,
+        leading=11,
+        textColor=colors.HexColor("#374151"),
+    )
+    styles["note"] = ParagraphStyle(
+        "S2NNote",
+        parent=base["BodyText"],
+        fontName="Helvetica",
+        fontSize=9,
+        leading=13,
+        backColor=colors.HexColor("#fff7ed"),
+        borderColor=colors.HexColor("#f59e0b"),
+        borderWidth=0.6,
+        borderPadding=8,
+        leftIndent=0,
+        rightIndent=0,
+        spaceAfter=10,
+    )
+    return styles
+
+
+def _p(text: Any, style: ParagraphStyle) -> Paragraph:
+    return Paragraph(_html(text).replace("\n", "<br/>"), style)
+
+
+def _table(rows: List[Tuple[str, Any]], styles: Dict[str, ParagraphStyle], col_widths=None) -> Table:
+    data = []
+    for key, value in rows:
+        data.append([
+            Paragraph(f"<b>{_html(key)}</b>", styles["small"]),
+            Paragraph(_html(_truthy_text(value)).replace("\n", "<br/>") or "-", styles["small"]),
+        ])
+
+    if col_widths is None:
+        col_widths = [45 * mm, 125 * mm]
+
+    table = Table(data, colWidths=col_widths, hAlign="LEFT")
+    table.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (0, -1), colors.HexColor("#e5e7eb")),
+                ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#d1d5db")),
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 7),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 7),
+                ("TOPPADDING", (0, 0), (-1, -1), 6),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+            ]
+        )
+    )
+    return table
+
+
+def _pre(text: Any, styles: Dict[str, ParagraphStyle], max_chars: int = 1800) -> Preformatted:
+    content = _truncate(text, max_chars)
+    return Preformatted(content, styles["small"], maxLineLength=110)
+
+
+def _section_title(story: List[Any], title: str, styles: Dict[str, ParagraphStyle]) -> None:
+    story.append(Spacer(1, 5))
+    story.append(Paragraph(title, styles["h1"]))
+    story.append(Spacer(1, 4))
+
+
+def _render_executive_summary(story: List[Any], finding: Dict[str, Any], styles: Dict[str, ParagraphStyle]) -> None:
+    _section_title(story, "1. Executive Summary", styles)
+    story.append(
+        _p(
+            "This report was generated from an actual S2N scan result and describes a confirmed XSS finding.",
+            styles["body"],
+        )
+    )
+    story.append(
+        _table(
+            [
+                ("Finding", finding.get("title") or "Reflected Cross-Site Scripting Detected"),
+                ("Severity", finding.get("severity") or "HIGH"),
+                ("Confidence", finding.get("confidence") or "FIRM"),
+                ("Target URL", finding.get("target_url") or finding.get("url")),
+                ("Affected Parameter", finding.get("parameter")),
+                ("Payload", finding.get("payload")),
+                ("Source Scanner", finding.get("source_scanner") or "s2n"),
+                ("Source Plugin", finding.get("source_plugin") or "xss"),
+            ],
+            styles,
+        )
+    )
+
+
+def _render_finding_detail(story: List[Any], finding: Dict[str, Any], styles: Dict[str, ParagraphStyle]) -> None:
+    reflection = _extract_reflection_info(finding)
+    risk = _as_dict(finding.get("risk"))
+
+    _section_title(story, "2. Finding Detail", styles)
+    story.append(
+        _table(
+            [
+                ("ID", finding.get("id") or finding.get("finding_id")),
+                ("Title", finding.get("title")),
+                ("Vulnerability Type", finding.get("vuln_type") or finding.get("vulnerability_type") or "XSS"),
+                ("XSS Type", finding.get("xss_type") or "reflected"),
+                ("CWE", finding.get("cwe") or "CWE-79"),
+                ("OWASP Category", finding.get("owasp_category") or "Injection / Cross-Site Scripting"),
+                ("HTTP Method", finding.get("method") or finding.get("http_method")),
+                ("Parameter", finding.get("parameter")),
+                ("Reflection Detected", reflection.get("detected")),
+                ("Reflected Value", reflection.get("reflected_value")),
+                ("Verification", reflection.get("verification")),
+                ("Risk Score", risk.get("risk_score")),
+                ("Likelihood", risk.get("likelihood")),
+                ("Impact", risk.get("impact")),
+            ],
+            styles,
+        )
+    )
+    story.append(Spacer(1, 8))
+    story.append(Paragraph("Description", styles["h2"]))
+    story.append(
+        _p(
+            finding.get("description")
+            or "User-controlled input was reflected in the HTTP response without clear output encoding.",
+            styles["body"],
+        )
+    )
+
+
+def _render_evidence(story: List[Any], finding: Dict[str, Any], styles: Dict[str, ParagraphStyle]) -> None:
+    evidence = finding.get("evidence")
+    response_snippet = finding.get("response_snippet") or _evidence_get(evidence, "response_snippet", evidence)
+
+    _section_title(story, "3. Evidence", styles)
+    story.append(Paragraph("Raw Evidence", styles["h2"]))
+    story.append(_pre(evidence, styles, 1800))
+    story.append(Spacer(1, 8))
+    story.append(Paragraph("Response Snippet", styles["h2"]))
+    story.append(_pre(response_snippet, styles, 1800))
+
+
+def _render_agent_judgement(story: List[Any], finding: Dict[str, Any], styles: Dict[str, ParagraphStyle]) -> None:
+    agent = _get_agent_response(finding)
+    _section_title(story, "4. XSSAgent Judgement", styles)
+    story.append(
+        _table(
+            [
+                ("Task", agent.get("task") or "selection"),
+                ("Should Run", agent.get("should_run")),
+                ("Context Known", agent.get("context_known")),
+                ("Selected Plugin", agent.get("selected_plugin") or finding.get("source_plugin") or "xss"),
+                ("Severity", agent.get("severity") or finding.get("severity")),
+                ("Confidence", agent.get("confidence") or finding.get("confidence")),
+                ("Fallback", agent.get("fallback")),
+                ("Reason", agent.get("reason") or "S2N detected reflected XSS payload in HTTP response."),
+            ],
+            styles,
+        )
+    )
+
+
+def _render_risk_and_remediation(story: List[Any], finding: Dict[str, Any], styles: Dict[str, ParagraphStyle]) -> None:
+    risk = _as_dict(finding.get("risk"))
+    _section_title(story, "5. Risk & Remediation", styles)
+    story.append(Paragraph("Risk", styles["h2"]))
+    story.append(
+        _table(
+            [
+                ("Severity", finding.get("severity") or "HIGH"),
+                ("Risk Score", risk.get("risk_score")),
+                ("Likelihood", risk.get("likelihood")),
+                ("Impact", risk.get("impact")),
+                ("Business Impact", risk.get("business_impact")),
+            ],
+            styles,
+        )
+    )
+    story.append(Spacer(1, 8))
+    story.append(Paragraph("Recommended Remediation", styles["h2"]))
+    remediation = [
+        "Apply context-aware output encoding before inserting user-controlled input into HTML.",
+        "Validate and constrain user input on the server side.",
+        "Avoid directly reflecting raw request parameters into responses.",
+        "Use safe DOM APIs such as textContent instead of innerHTML where possible.",
+        "Add Content Security Policy as a defense-in-depth control.",
+        "Re-test the affected parameter with the same payload after remediation.",
+    ]
+    for idx, item in enumerate(remediation, start=1):
+        story.append(_p(f"{idx}. {item}", styles["body"]))
+
+
+def _render_internal_contexts(
+    story: List[Any],
+    contexts: List[Dict[str, Any]],
+    styles: Dict[str, ParagraphStyle],
+) -> None:
+    _section_title(story, "6. Internal Knowledge Retrieved by ChromaDB", styles)
+    if not contexts:
+        story.append(_p("No internal RAG context was retrieved.", styles["body"]))
+        return
+
+    for idx, ctx in enumerate(contexts, start=1):
+        title = ctx.get("title") or ctx.get("name") or f"Internal Context {idx}"
+        source = ctx.get("source") or ctx.get("path") or "-"
+        retriever = ctx.get("retriever") or "-"
+        score = ctx.get("score") or "-"
+        content = ctx.get("content") or ctx.get("text") or ctx.get("chunk") or ""
+        story.append(Paragraph(f"6.{idx} {escape(_safe(title))}", styles["h2"]))
+        story.append(_table([("Source", source), ("Retriever", retriever), ("Score", score)], styles))
+        story.append(Spacer(1, 4))
+        story.append(_pre(content, styles, 1100))
+        story.append(Spacer(1, 8))
+
+
+def _render_external_references(
+    story: List[Any],
+    finding: Dict[str, Any],
+    external_contexts: List[Dict[str, Any]],
+    styles: Dict[str, ParagraphStyle],
+) -> None:
+    _section_title(story, "7. External Official References", styles)
+    story.append(
+        _p(
+            "This section contains official reference matches from OWASP, CWE, MDN, and PortSwigger. "
+            "If no live external retriever result is available, the report falls back to official catalog hints "
+            "derived from the normalized finding.",
+            styles["note"],
+        )
+    )
+
+    refs = external_contexts[:] if external_contexts else _build_external_reference_fallback(finding)
+
+    if not refs:
+        story.append(_p("No external official reference was matched.", styles["body"]))
+        return
+
+    for idx, ref in enumerate(refs, start=1):
+        title = ref.get("title") or ref.get("name") or f"External Reference {idx}"
+        source = ref.get("source") or ref.get("path") or "-"
+        retriever = ref.get("retriever") or ref.get("source_type") or "official_reference"
+        score = ref.get("score") or "-"
+        content = ref.get("content") or ref.get("text") or ref.get("summary") or ""
+        story.append(Paragraph(f"7.{idx} {escape(_safe(title))}", styles["h2"]))
+        story.append(
+            _table(
+                [
+                    ("Source", source),
+                    ("Retriever", retriever),
+                    ("Score", score),
+                ],
+                styles,
+            )
+        )
+        story.append(Spacer(1, 4))
+        story.append(_p(content, styles["body"]))
+        story.append(Spacer(1, 8))
+
+
+def _render_retest(story: List[Any], finding: Dict[str, Any], styles: Dict[str, ParagraphStyle]) -> None:
+    _section_title(story, "8. Retest Recommendation", styles)
+    story.append(
+        _p(
+            "Re-run the S2N XSS plugin against the affected endpoint after remediation.",
+            styles["body"],
+        )
+    )
+    story.append(
+        _table(
+            [
+                ("Target URL", finding.get("target_url") or finding.get("url")),
+                ("Parameter", finding.get("parameter")),
+                ("Payload", finding.get("payload")),
+                ("Expected Secure Result", "The payload should be encoded or rejected and must not execute as JavaScript."),
+            ],
+            styles,
+        )
+    )
+
+
+def generate_xss_pdf_report(
+    finding: Dict[str, Any],
+    rag_contexts: Optional[List[Dict[str, Any]]] = None,
+    pdf_path: str = DEFAULT_PDF_PATH,
+) -> str:
+    finding = finding or {}
+    rag_contexts = [ctx for ctx in _as_list(rag_contexts) if isinstance(ctx, dict)]
+    internal_contexts, external_contexts = _split_contexts(rag_contexts)
+
+    output = Path(pdf_path)
+    output.parent.mkdir(parents=True, exist_ok=True)
+
+    doc = SimpleDocTemplate(
+        str(output),
+        pagesize=A4,
+        rightMargin=16 * mm,
+        leftMargin=16 * mm,
+        topMargin=14 * mm,
+        bottomMargin=14 * mm,
+        title="S2N XSS Security Report",
+        author="S2N XSSAgent",
+    )
+
+    styles = _styles()
+    story: List[Any] = []
+    story.append(Paragraph("S2N XSS Security Report", styles["title"]))
+    story.append(_p(f"Generated at: {datetime.utcnow().isoformat()}Z", styles["small"]))
+    story.append(Spacer(1, 10))
+
+    _render_executive_summary(story, finding, styles)
+    _render_finding_detail(story, finding, styles)
+    _render_evidence(story, finding, styles)
+    _render_agent_judgement(story, finding, styles)
+    _render_risk_and_remediation(story, finding, styles)
+    _render_internal_contexts(story, internal_contexts, styles)
+    _render_external_references(story, finding, external_contexts, styles)
+    _render_retest(story, finding, styles)
+
+    doc.build(story)
+    return str(output)
+
+
+# Backward-compatible aliases for different runner versions.
+def generate_pdf_report(
+    finding: Dict[str, Any],
+    rag_contexts: Optional[List[Dict[str, Any]]] = None,
+    pdf_path: str = DEFAULT_PDF_PATH,
+) -> str:
+    return generate_xss_pdf_report(finding, rag_contexts, pdf_path)
+
+
+def generate_pdf(
+    finding: Dict[str, Any],
+    rag_contexts: Optional[List[Dict[str, Any]]] = None,
+    pdf_path: str = DEFAULT_PDF_PATH,
+) -> str:
+    return generate_xss_pdf_report(finding, rag_contexts, pdf_path)

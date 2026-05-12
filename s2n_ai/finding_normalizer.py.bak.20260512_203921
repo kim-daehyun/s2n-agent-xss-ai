@@ -5,6 +5,21 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List
 
 
+# --- S2N normalizer DVWA parameter safety patch ---
+def _s2n_force_dvwa_name_parameter_from_url(finding):
+    try:
+        from urllib.parse import urlparse, parse_qs
+        url = str(finding.get("url") or finding.get("target_url") or "")
+        parsed = urlparse(url)
+        qs = parse_qs(parsed.query)
+        if "/vulnerabilities/xss_r" in parsed.path and "name" in qs:
+            finding["parameter"] = "name"
+            finding["param"] = "name"
+            finding["discovery_mode"] = "raw_http_reflected_probe"
+    except Exception:
+        pass
+    return _s2n_force_dvwa_name_parameter_from_url(finding)
+# --- end S2N normalizer DVWA parameter safety patch ---
 
 
 
@@ -434,7 +449,7 @@ def normalize_xss_finding(
     normalized["rag_hints"] = _build_rag_hints(normalized)
     normalized["report_fields"] = _build_report_fields(normalized)
 
-    return normalized
+    return _s2n_force_dvwa_name_parameter_from_url(normalized)
 
 
 def _legacy_report_finding(normalized: Dict[str, Any]) -> Dict[str, Any]:

@@ -1,0 +1,29 @@
+services:
+  s2n-agent-report:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: s2n-agent-url-to-pdf:latest
+    container_name: s2n-agent-report
+    working_dir: /app
+    environment:
+      PYTHONPATH: /app
+      PYTHONUNBUFFERED: "1"
+      PYTHONDONTWRITEBYTECODE: "1"
+      HF_HOME: /app/storage/huggingface
+      TRANSFORMERS_CACHE: /app/storage/huggingface
+      SENTENCE_TRANSFORMERS_HOME: /app/storage/sentence_transformers
+    volumes:
+      - ./reports:/app/reports
+      - ./docs:/app/docs
+      - ./storage:/app/storage
+      - ./adapters:/app/adapters
+    stdin_open: true
+    tty: true
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    command: >
+      python -B scripts/plugin_agents/run_url_to_pdf.py
+      --reindex
+      --use-peft-agent
+      --adapter-path /app/adapters/xss-agent-qwen3b-clean-peft
