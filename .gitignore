@@ -104,3 +104,27 @@ reports/generated/
 __pycache__/
 *.pyc
 .DS_Store
+
+# local patch backups
+*.bak
+*.bak_*
+*.broken*
+*.tmp
+*.orig
+
+# generated outputs
+reports/generated/
+*.pdf
+*.md
+
+# Python cache
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# local env
+.env
+.venv/
+
+# local vector db / runtime storage
+storage/
