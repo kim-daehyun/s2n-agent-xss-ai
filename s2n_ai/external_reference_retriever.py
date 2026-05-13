@@ -5,6 +5,49 @@ import re
 OFFICIAL_REFERENCES: List[Dict[str, Any]] = [
     {
         "source": "OWASP",
+        "title": "OWASP Risk Rating Methodology",
+        "url": "https://owasp.org/www-community/OWASP_Risk_Rating_Methodology",
+        "topics": [
+            "risk rating",
+            "likelihood",
+            "impact",
+            "severity",
+            "application security risk",
+            "owasp",
+        ],
+        "summary": (
+            "OWASP describes application security risk as a combination of likelihood and impact. "
+            "It recommends estimating both dimensions and combining them into an overall severity."
+        ),
+        "recommended_use": (
+            "Use this reference as the primary rationale for evidence-based likelihood and impact scoring."
+        ),
+    },
+    {
+        "source": "FIRST",
+        "title": "CVSS v3.1 Qualitative Severity Rating Scale",
+        "url": "https://www.first.org/cvss/v3.1/specification.document",
+        "topics": [
+            "cvss",
+            "qualitative severity",
+            "severity rating",
+            "low",
+            "medium",
+            "high",
+            "critical",
+            "score range",
+        ],
+        "summary": (
+            "FIRST CVSS v3.1 defines qualitative severity bands for 0.0-10.0 scores: "
+            "Low, Medium, High, and Critical. This project uses those bands as a familiar "
+            "reporting vocabulary, not as a full CVSS vector calculation."
+        ),
+        "recommended_use": (
+            "Use this reference to explain why report scores are grouped into Low, Medium, High, and Critical bands."
+        ),
+    },
+    {
+        "source": "OWASP",
         "title": "OWASP XSS Prevention Cheat Sheet",
         "url": "https://cheatsheetseries.owasp.org/cheatsheets/Cross_Site_Scripting_Prevention_Cheat_Sheet.html",
         "topics": [
@@ -195,6 +238,9 @@ def _score_reference(
             matched_terms.append(f"summary:{token}")
 
     key_phrases = [
+        "risk rating",
+        "likelihood impact",
+        "qualitative severity",
         "reflected xss",
         "cross site scripting",
         "output encoding",
@@ -237,8 +283,14 @@ def _score_reference(
         score += 2.0
         matched_terms.append("type:reflected_xss")
 
+    if finding_metadata.get("risk_model") and any(
+        term in topic_text.lower() for term in ("risk rating", "qualitative severity", "cvss")
+    ):
+        score += 3.0
+        matched_terms.append("risk_model")
+
     source = reference.get("source", "")
-    if source in {"OWASP", "CWE", "MDN", "PortSwigger"}:
+    if source in {"OWASP", "CWE", "MDN", "PortSwigger", "FIRST"}:
         score += 0.5
         matched_terms.append(f"official:{source}")
 

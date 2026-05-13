@@ -251,6 +251,28 @@ def _risk(finding: Dict[str, Any], key: str, default: Any = None) -> Any:
     return default
 
 
+def _risk_list(finding: Dict[str, Any], key: str) -> List[Any]:
+    risk = finding.get("risk") or {}
+    if not isinstance(risk, dict):
+        return []
+    value = risk.get(key)
+    if isinstance(value, list):
+        return value
+    if value:
+        return [value]
+    return []
+
+
+def _risk_scoring_basis(finding: Dict[str, Any]) -> List[str]:
+    basis = [str(item) for item in _risk_list(finding, "scoring_basis") if item]
+    if basis:
+        return basis
+    return [
+        "Severity is calculated from evidence using an OWASP-style likelihood and impact matrix.",
+        "The report score is a normalized 0-100 value aligned to CVSS qualitative severity bands, not a formal CVSS vector.",
+    ]
+
+
 def _agent(finding: Dict[str, Any], key: str, default: Any = None) -> Any:
     agent_response = finding.get("agent_response") or {}
     if isinstance(agent_response, dict):
@@ -452,6 +474,16 @@ def _dedupe_contexts(contexts: List[Dict[str, Any]], limit: int = 3) -> List[Dic
 
 def _official_reference_catalog() -> Dict[str, Dict[str, str]]:
     return {
+        "owasp-risk": {
+            "title": "OWASP Risk Rating Methodology",
+            "source": "https://owasp.org/www-community/OWASP_Risk_Rating_Methodology",
+            "summary": "OWASP describes application security risk as a combination of likelihood and impact, then combines those levels into an overall severity.",
+        },
+        "cvss": {
+            "title": "FIRST CVSS v3.1 Qualitative Severity Rating Scale",
+            "source": "https://www.first.org/cvss/v3.1/specification.document",
+            "summary": "FIRST CVSS defines familiar qualitative severity bands such as Low, Medium, High, and Critical for vulnerability prioritization.",
+        },
         "owasp": {
             "title": "OWASP Cross Site Scripting Prevention Cheat Sheet",
             "source": "https://cheatsheetseries.owasp.org/cheatsheets/Cross_Site_Scripting_Prevention_Cheat_Sheet.html",
@@ -500,6 +532,10 @@ def _official_refs_from_finding(finding: Dict[str, Any], external_contexts: List
 
     catalog = _official_reference_catalog()
     keys = []
+    if "risk" in hint_text or "severity" in hint_text or "owasp" in hint_text:
+        keys.append("owasp-risk")
+    if "cvss" in hint_text or "severity" in hint_text:
+        keys.append("cvss")
     if "owasp" in hint_text or "xss" in hint_text:
         keys.append("owasp")
     if "cwe-79" in hint_text or "cwe" in hint_text or "xss" in hint_text:
@@ -937,16 +973,16 @@ def generate_xss_pdf_report(
         ("Risk Score", _risk(finding, "risk_score", "85")),
         ("Likelihood", _risk(finding, "likelihood", "High")),
         ("Impact", _risk(finding, "impact", "High")),
+        ("OWASP Likelihood Score", _risk(finding, "owasp_likelihood_score", "-")),
+        ("OWASP Impact Score", _risk(finding, "owasp_impact_score", "-")),
+        ("Scoring Model", _risk(finding, "severity_source", "-")),
+        ("Score Scale", _risk(finding, "score_scale", "-")),
+        ("Scanner Reported Severity", _risk(finding, "scanner_reported_severity", "-")),
         ("Business Impact", _risk(finding, "business_impact", "An attacker may execute arbitrary JavaScript in a victim browser, steal session data, perform actions as the user, or manipulate page content.")),
     ])}
 
     <h3>Scoring Basis</h3>
-    {_manual_bullets([
-        "Severity is high because browser-executable JavaScript was confirmed by scanner evidence.",
-        "Confidence is firm because the payload and execution/reflection evidence were verified by the scanner.",
-        "Likelihood is high when user-controlled input is returned without context-aware output encoding.",
-        "Impact is high because reflected script execution can lead to session theft, user action abuse, or page manipulation.",
-    ])}
+    {_manual_bullets(_risk_scoring_basis(finding))}
 
     <h3>Recommended Remediation</h3>
     {_manual_numbers([
@@ -1007,5 +1043,3 @@ def generate_xss_pdf_report(
 
 generate_pdf_report = generate_xss_pdf_report
 generate_pdf = generate_xss_pdf_report
-
-

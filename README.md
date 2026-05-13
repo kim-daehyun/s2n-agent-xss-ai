@@ -65,6 +65,7 @@ scripts/plugin_agents/run_url_to_pdf.py   현재 배포 기준 메인 CLI
 s2n_ai/                                   정규화, RAG, Markdown/PDF 생성 코드
 docs/security_guides/                     로컬 RAG에 쓰는 보안 가이드 문서
 docs/KNOWN_LIMITATIONS.md                 알려진 제한사항
+docs/SEVERITY_SCORING.md                  XSS 심각도 산정 기준
 serving/                                  선택 사항: FastAPI PEFT inference server
 s2nagent/                                 과거/확장용 S2N-Agent task/client/plugin 코드
 reports/generated/                        실행 결과 PDF/JSON 출력 위치, Git 제외
@@ -430,6 +431,7 @@ git push origin v0.1.0
 ## 12. 알려진 제한사항
 
 자세한 내용은 [docs/KNOWN_LIMITATIONS.md](docs/KNOWN_LIMITATIONS.md)를 참고하세요.
+심각도 산정 기준은 [docs/SEVERITY_SCORING.md](docs/SEVERITY_SCORING.md)를 참고하세요.
 
 요약하면:
 

@@ -206,6 +206,8 @@ def build_rag_query_from_finding(finding: Dict[str, Any]) -> str:
         "HTML encoding",
         "JavaScript encoding",
         "Content Security Policy",
+        "OWASP risk rating likelihood impact severity",
+        "CVSS qualitative severity rating",
         f"severity {severity}",
         f"parameter {parameter}",
     ]
@@ -263,6 +265,7 @@ def build_rag_metadata_from_finding(finding: Dict[str, Any]) -> Dict[str, Any]:
         "xss_type": xss_type,
         "injection_context": injection_context,
         "severity": severity,
+        "risk_model": "owasp_likelihood_impact_with_cvss_qualitative_bands",
         "parameter": _safe(finding.get("parameter"), "unknown"),
         "payload_type": "script_tag"
         if "<script" in _lower(finding.get("payload"))
@@ -270,6 +273,8 @@ def build_rag_metadata_from_finding(finding: Dict[str, Any]) -> Dict[str, Any]:
         "reflection_detected": reflected,
         "recommended_docs": docs,
         "official_references": [
+            "OWASP Risk Rating Methodology",
+            "FIRST CVSS Qualitative Severity Rating Scale",
             "OWASP XSS Prevention Cheat Sheet",
             "CWE-79",
             "MDN XSS",
