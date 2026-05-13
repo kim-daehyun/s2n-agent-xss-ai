@@ -3,7 +3,9 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: s2n-agent-url-to-pdf:latest
+      args:
+        APP_VERSION: ${S2N_REPORT_VERSION:-0.1.0}
+    image: ${S2N_REPORT_IMAGE:-s2n-agent-url-to-pdf:0.1.0}
     container_name: s2n-agent-report
     working_dir: /app
     environment:

@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Any, Dict, List, Optional
 
 from serving.model_loader import XSSAgentModel
@@ -15,9 +15,9 @@ class XSSAgentRequest(BaseModel):
     task: str
     url: str
     method: str = "GET"
-    parameters: List[str] = []
+    parameters: List[str] = Field(default_factory=list)
     response_sample: Optional[str] = None
-    evidence: Dict[str, Any] = {}
+    evidence: Dict[str, Any] = Field(default_factory=dict)
 
 
 class XSSAgentResponse(BaseModel):

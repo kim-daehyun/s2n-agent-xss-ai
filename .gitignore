@@ -1,25 +1,42 @@
-.claude
+# Local agent/editor state
+.claude/
 .rtk.venv/
-
-# Python cache
-__pycache__/
-*.py[cod]
 .venv/
 venv/
+.vscode/
+.idea/
+.DS_Store
 
-# Environment / secrets
+# Python/runtime cache
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Environment, secrets, and logs
 .env
 .env.*
 *.key
 *.pem
 secrets/
-
-# Logs
 *.log
 logs/
 
-# Model weights / checkpoints
-adapters/
+# Generated reports and runtime storage
+reports/generated/
+reports/private/
+reports/raw/
+storage/
+
+# Local/private data
+data/raw/
+data/private/
+
+# Model weights, adapters, and checkpoints.
+# Keep adapters local or distribute them as release assets/Git LFS, not normal Git files.
+adapters/*
+!adapters/README.md
 models/
 checkpoints/
 *.safetensors
@@ -27,104 +44,27 @@ checkpoints/
 *.pt
 *.pth
 *.gguf
-
-# Hugging Face / cache
 .cache/
 hf_cache/
 huggingface/
 transformers_cache/
 
-# Private data / raw reports
-data/raw/
-data/private/
-reports/private/
-reports/raw/
-
-# OS / IDE
-.DS_Store
-.vscode/
-.idea/
-
-# Trash / backup experiments
-_trash*/
-_trash_*/
-trash/
-backup/
-
-# External cloned repos or third-party code
-external/
-
-# Temporary evaluation artifacts
-reports/xss_agent/*_details.json
-reports/xss_agent/*_eval.json
-reports/xss_agent/*_eval_details.json
-reports/xss_agent/*_train.log
-reports/xss_agent/*.log
-
-# Keep sample reports if needed
-!reports/xss_agent/sample_xss_report.md
-!reports/xss_agent/eval_comparison_8b.md
-!reports/xss_agent/baseline_summary.md
-
-# Local trash / experiments
-_trash*/
-_trash_*/
-trash/
-backup/
-external/
-
-# Exclude full base models and deployment artifacts
-models/hf/
-models/ollama-adapter/
-models/**/*.gguf
-models/**/model-*.safetensors
-models/**/*.bin
-models/**/*.pt
-models/**/*.pth
-
-# Exclude local trash and env
-_trash*/
-.venv/
-venv/
-__pycache__/
-*.log
-
-# Allow fine-tuned PEFT adapters to be committed
-!adapters/
-!adapters/xss-agent-8b-peft/
-!adapters/xss-agent-8b-peft/**
-!adapters/xss-agent-8b-peft-smoke/
-!adapters/xss-agent-8b-peft-smoke/**
-!adapters/xss-agent-qwen3b-clean-peft/
-!adapters/xss-agent-qwen3b-clean-peft/**
-
-# local vector db / generated reports
-storage/chroma_xss_guides/
-reports/generated/
-__pycache__/
-*.pyc
-.DS_Store
-
-# local patch backups
+# Backup and experiment artifacts
 *.bak
+*.bak.*
 *.bak_*
 *.broken*
 *.tmp
 *.orig
+_trash*/
+_trash_*/
+.trash*/
+trash/
+backup/
+external/
 
-# generated outputs
-reports/generated/
-*.pdf
-*.md
-
-# Python cache
-__pycache__/
-*.pyc
-.pytest_cache/
-
-# local env
-.env
-.venv/
-
-# local vector db / runtime storage
-storage/
+# Temporary evaluation artifacts
+reports/xss_agent/*_details.json
+reports/xss_agent/*_eval_details.json
+reports/xss_agent/*_train.log
+reports/xss_agent/*.log
