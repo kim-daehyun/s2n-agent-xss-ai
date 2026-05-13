@@ -36,4 +36,4 @@ dev = [
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["s2nagent*"]
+include = ["s2nagent*", "s2n_ai*", "serving*"]

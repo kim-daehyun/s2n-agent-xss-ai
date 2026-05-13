@@ -6,9 +6,9 @@ class XSSAgentRequest(BaseModel):
     task: str = Field(..., description="selection | payload_planning | false_positive | next_action")
     url: str
     method: str = "GET"
-    parameters: List[str] = []
+    parameters: List[str] = Field(default_factory=list)
     response_sample: Optional[str] = None
-    evidence: Dict[str, Any] = {}
+    evidence: Dict[str, Any] = Field(default_factory=dict)
 
 
 class XSSAgentResponse(BaseModel):
@@ -28,7 +28,7 @@ class NormalizedFinding(BaseModel):
     method: str
     parameter: Optional[str] = None
     payload: Optional[str] = None
-    evidence: Dict[str, Any] = {}
-    agent_judgement: Dict[str, Any] = {}
+    evidence: Dict[str, Any] = Field(default_factory=dict)
+    agent_judgement: Dict[str, Any] = Field(default_factory=dict)
     severity: str = "unknown"
     next_action: str = "review"

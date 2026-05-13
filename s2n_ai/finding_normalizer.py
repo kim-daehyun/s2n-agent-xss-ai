@@ -471,3 +471,10 @@ def _legacy_report_finding(normalized: Dict[str, Any]) -> Dict[str, Any]:
         "impact": risk.get("impact"),
         "recommended_docs": normalized.get("recommended_docs") or _recommended_docs_for_xss(),
     }
+
+
+def to_legacy_report_finding(normalized: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Public compatibility wrapper used by older FastAPI report demo scripts.
+    """
+    return _legacy_report_finding(normalized)

@@ -1,5 +1,12 @@
 FROM python:3.11-slim
 
+ARG APP_VERSION=0.1.0
+
+LABEL org.opencontainers.image.title="S2N Agent URL-to-PDF XSS Reporter"
+LABEL org.opencontainers.image.description="Local Docker runner that validates authorized XSS targets and generates PDF reports."
+LABEL org.opencontainers.image.version="${APP_VERSION}"
+LABEL org.opencontainers.image.licenses="MIT"
+
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONPATH=/app

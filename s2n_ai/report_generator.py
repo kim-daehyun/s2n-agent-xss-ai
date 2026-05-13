@@ -27,7 +27,23 @@ def _evidence_get(evidence: Any, key: str, default: Any = None) -> Any:
     prevents: AttributeError: 'str' object has no attribute 'get'
     """
     if isinstance(evidence, dict):
-        return _evidence_get(evidence, key, default)
+        if key in evidence:
+            return evidence.get(key, default)
+        if key in ("reflection", "reflected", "reflection_detected", "detected"):
+            reflection = evidence.get("reflection") or evidence.get("reflection_detected")
+            if isinstance(reflection, dict):
+                return reflection.get("detected", default)
+            if reflection is not None:
+                return reflection
+        if key in ("reflected_value", "payload"):
+            reflection = evidence.get("reflection") or evidence.get("reflection_detected")
+            if isinstance(reflection, dict):
+                return reflection.get("reflected_value", default)
+        if key in ("response_snippet", "snippet", "body", "raw"):
+            response = evidence.get("response")
+            if isinstance(response, dict):
+                return response.get("snippet") or response.get("body") or default
+        return default
 
     text = "" if evidence is None else str(evidence)
     lower = text.lower()

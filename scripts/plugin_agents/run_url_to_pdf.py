@@ -64,6 +64,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 REPORT_DIR = PROJECT_ROOT / "reports" / "generated"
 CHROMA_DIR = PROJECT_ROOT / "storage" / "chroma_xss_guides"
 DEFAULT_ADAPTER_PATH = PROJECT_ROOT / "adapters" / "xss-agent-qwen3b-clean-peft"
+DEFAULT_ADAPTER_REPO = "emmaemmaemma123/xss-agent-qwen3b-clean-peft"
 
 _RUN_T0 = time.time()
 
@@ -717,14 +718,76 @@ def run_peft(finding: Dict[str, Any], adapter_path: Path) -> Dict[str, Any]:
     return parsed
 
 
-def attach_peft(scan: Dict[str, Any], adapter_path: Path) -> Dict[str, Any]:
+def validate_peft_adapter(adapter_path: Path) -> None:
+    adapter_path = adapter_path.resolve()
+    required_files = [
+        "adapter_config.json",
+        "adapter_model.safetensors",
+        "tokenizer.json",
+        "tokenizer_config.json",
+    ]
+    missing = [name for name in required_files if not (adapter_path / name).exists()]
+    if missing:
+        raise RuntimeError(
+            "PEFT adapter is required but incomplete. "
+            f"adapter_path={adapter_path}, missing={', '.join(missing)}. "
+            "Place the adapter under ./adapters and mount it at /app/adapters in Docker."
+        )
+
+
+def download_peft_adapter(adapter_repo: str, adapter_path: Path) -> None:
+    adapter_path = adapter_path.resolve()
+    adapter_path.mkdir(parents=True, exist_ok=True)
+    print(f"[PEFT] downloading adapter from Hugging Face: {adapter_repo}")
+    print(f"[PEFT] local adapter path: {adapter_path}")
+
+    try:
+        from huggingface_hub import snapshot_download
+    except ImportError as exc:
+        raise RuntimeError(
+            "huggingface_hub is required to download the PEFT adapter. "
+            "Install requirements-lock.txt or run inside the provided Docker image."
+        ) from exc
+
+    try:
+        snapshot_download(
+            repo_id=adapter_repo,
+            local_dir=str(adapter_path),
+            local_dir_use_symlinks=False,
+        )
+    except TypeError:
+        snapshot_download(
+            repo_id=adapter_repo,
+            local_dir=str(adapter_path),
+        )
+
+    validate_peft_adapter(adapter_path)
+    print("[OK] PEFT adapter downloaded and validated")
+
+
+def ensure_peft_adapter(adapter_path: Path, adapter_repo: str, *, auto_download: bool) -> None:
+    try:
+        validate_peft_adapter(adapter_path)
+        return
+    except Exception as exc:
+        if not auto_download:
+            raise
+        print(f"[PEFT][INFO] local adapter is missing or incomplete: {exc}")
+
+    download_peft_adapter(adapter_repo=adapter_repo, adapter_path=adapter_path)
+
+
+def attach_peft(scan: Dict[str, Any], adapter_path: Path, *, allow_fallback: bool = False) -> Dict[str, Any]:
     finding = scan["findings"][0]
     try:
+        validate_peft_adapter(adapter_path)
         agent = run_peft(finding, adapter_path)
         finding["agent_response"] = agent
         finding["agent_decision"] = agent
         print("[OK] PEFT XSSAgent response attached to finding")
     except Exception as exc:
+        if not allow_fallback:
+            raise RuntimeError(f"Required PEFT XSSAgent inference failed: {type(exc).__name__}: {exc}") from exc
         print(f"[WARN] PEFT failed. Keeping rule-based response. reason={type(exc).__name__}: {exc}")
         finding.setdefault("agent_response", {})
         finding["agent_response"]["model_source"] = "peft_failed_rule_based_fallback"
@@ -890,9 +953,17 @@ def main() -> int:
     parser.add_argument("--timeout", type=int, default=25)
     parser.add_argument("--max-candidates", type=int, default=80)
     parser.add_argument("--reindex", action="store_true")
-    parser.add_argument("--use-peft-agent", action="store_true", default=False)
+    parser.add_argument("--use-peft-agent", action="store_true", default=True)
     parser.add_argument("--no-peft-agent", action="store_false", dest="use_peft_agent")
     parser.add_argument("--adapter-path", default=str(DEFAULT_ADAPTER_PATH))
+    parser.add_argument("--adapter-repo", default=DEFAULT_ADAPTER_REPO)
+    parser.add_argument("--no-auto-download-adapter", action="store_true", default=False)
+    parser.add_argument(
+        "--allow-peft-fallback",
+        action="store_true",
+        default=False,
+        help="Allow report generation to continue with the rule-based finding if PEFT inference fails.",
+    )
     args = parser.parse_args()
 
     print("[S2N URL-to-PDF local test runner]")
@@ -914,6 +985,18 @@ def main() -> int:
     output_pdf = Path(args.output_pdf)
     if not output_pdf.is_absolute():
         output_pdf = PROJECT_ROOT / output_pdf
+
+    if args.use_peft_agent:
+        try:
+            ensure_peft_adapter(
+                Path(args.adapter_path),
+                args.adapter_repo,
+                auto_download=not args.no_auto_download_adapter,
+            )
+        except Exception as exc:
+            if not args.allow_peft_fallback:
+                raise SystemExit(f"[PEFT][ERROR] {exc}") from exc
+            print(f"[PEFT][WARN] {exc}")
 
     try:
         if url_contains_payload(url):
@@ -974,10 +1057,10 @@ def main() -> int:
     if args.use_peft_agent:
         step_log("[3] Fine-tuned PEFT XSSAgent inference started. This is the slowest stage on CPU/Docker.")
         step_log("[3] Loading Qwen base model + PEFT adapter, then generating JSON decision.")
-        scan = attach_peft(scan, Path(args.adapter_path))
+        scan = attach_peft(scan, Path(args.adapter_path), allow_fallback=args.allow_peft_fallback)
         step_log("[3] PEFT XSSAgent inference finished.")
     else:
-        step_log("[3] Fine-tuned PEFT XSSAgent inference skipped. Use --use-peft-agent for final portfolio run.")
+        step_log("[3] Fine-tuned PEFT XSSAgent inference skipped by explicit --no-peft-agent.")
 
     step_log("[4] Normalizer/RAG/PDF pipeline started.")
     _s2n_postprocess_finding_semantics(scan)
