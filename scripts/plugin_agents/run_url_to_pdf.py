@@ -851,7 +851,7 @@ def retrieve_rag(normalized: Dict[str, Any], reindex: bool) -> List[Dict[str, An
         result = retrieve_hybrid_context(
             finding=normalized,
             top_k_internal=3,
-            top_k_external=4,
+            top_k_external=6,
             internal_backend="chroma",
         )
         if isinstance(result, dict):
@@ -906,6 +906,16 @@ def generate(scan: Dict[str, Any], output_pdf: Path, reindex: bool) -> None:
     normalized["_scan_summary"] = scan.get("summary") or {}
 
     rag_contexts = retrieve_rag(normalized, reindex)
+    try:
+        from s2n_ai.finding_normalizer import apply_rag_supported_risk
+
+        normalized = apply_rag_supported_risk(normalized, rag_contexts)
+        scan["findings"][0]["severity"] = normalized.get("severity", scan["findings"][0].get("severity"))
+        scan["findings"][0]["risk"] = normalized.get("risk", scan["findings"][0].get("risk"))
+        scan.setdefault("summary", {})
+        scan["summary"]["severity_counts"] = {normalized.get("severity", "UNKNOWN"): 1}
+    except Exception as exc:
+        print(f"[WARN] RAG-supported risk recalculation failed: {type(exc).__name__}: {exc}")
 
     REPORT_DIR.mkdir(parents=True, exist_ok=True)
     slug = safe_slug(compact_url(scan["target_url"]))

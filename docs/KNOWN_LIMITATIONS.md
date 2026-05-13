@@ -38,6 +38,7 @@
 
 - 내부 RAG는 `docs/security_guides/*.md` 파일을 기반으로 합니다.
 - 공식 레퍼런스 매핑은 실시간 웹 검색이 아니라 curated catalog 기반입니다.
+- 심각도 산정은 OWASP/CVSS/CWE/MDN/PortSwigger 기준을 참고한 내부 정책이며, 정식 CVSS vector 계산기는 아닙니다.
 - ChromaDB runtime 데이터는 `storage/` 아래에 생성되며 Git에 올리지 않습니다.
 
 ## PDF 렌더링 한계

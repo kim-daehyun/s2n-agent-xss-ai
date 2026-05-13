@@ -178,48 +178,293 @@ def _recommended_docs_for_xss() -> List[str]:
     ]
 
 
-def calculate_risk(finding: Dict[str, Any]) -> Dict[str, Any]:
-    severity = _normalize_severity(finding.get("severity"))
+def _as_dict(value: Any) -> Dict[str, Any]:
+    if isinstance(value, dict):
+        return value
+    return {}
 
-    score_map = {
-        "CRITICAL": 95,
-        "HIGH": 85,
-        "MEDIUM": 60,
-        "LOW": 35,
-        "INFO": 10,
-        "UNKNOWN": 50,
-    }
 
-    likelihood_map = {
-        "CRITICAL": "High",
-        "HIGH": "High",
-        "MEDIUM": "Medium",
-        "LOW": "Low",
-        "INFO": "Low",
-        "UNKNOWN": "Unknown",
-    }
+def _as_list(value: Any) -> List[Any]:
+    if value is None:
+        return []
+    if isinstance(value, list):
+        return value
+    if isinstance(value, tuple):
+        return list(value)
+    return [value]
 
-    impact_map = {
-        "CRITICAL": "Critical",
-        "HIGH": "High",
-        "MEDIUM": "Medium",
-        "LOW": "Low",
-        "INFO": "Informational",
-        "UNKNOWN": "Unknown",
-    }
+
+def _contains_any(text: str, terms: List[str]) -> bool:
+    normalized = (text or "").lower()
+    return any(term in normalized for term in terms)
+
+
+def _score_level(score: int) -> str:
+    # OWASP Risk Rating Methodology splits 0-9 likelihood/impact into
+    # low (<3), medium (<6), and high (6-9) bands.
+    if score >= 6:
+        return "High"
+    if score >= 3:
+        return "Medium"
+    return "Low"
+
+
+def _risk_score_from_likelihood_impact(likelihood_score: int, impact_score: int) -> int:
+    """
+    Convert OWASP-style 0-9 likelihood/impact scores into a 0-100 report score.
+
+    The score is calculated before severity is assigned. Impact is weighted a
+    little higher than likelihood because XSS findings with sensitive data,
+    stored execution, or privileged context should be prioritized even when the
+    trigger path is not fully automated.
+    """
+    weighted = (likelihood_score * 0.45) + (impact_score * 0.55)
+    return int(round((weighted / 9.0) * 100))
+
+
+def _severity_from_risk_score(risk_score: int) -> str:
+    # CVSS v3.1 qualitative bands are 0.1-3.9 Low, 4.0-6.9 Medium,
+    # 7.0-8.9 High, and 9.0-10.0 Critical. This project uses the same
+    # band idea on a 0-100 report scale.
+    if risk_score >= 90:
+        return "CRITICAL"
+    if risk_score >= 70:
+        return "HIGH"
+    if risk_score >= 40:
+        return "MEDIUM"
+    if risk_score >= 10:
+        return "LOW"
+    return "INFO"
+
+
+def _extract_rag_reference_basis(rag_contexts: Any) -> List[Dict[str, Any]]:
+    references: List[Dict[str, Any]] = []
+    seen = set()
+
+    for item in _as_list(rag_contexts):
+        if not isinstance(item, dict):
+            continue
+        retriever = _safe(item.get("retriever"), "").lower()
+        source_type = _safe(item.get("source_type"), "").lower()
+        source = _safe(item.get("source") or item.get("url") or item.get("path"), "")
+        title = _safe(item.get("title") or item.get("name"), "")
+
+        is_official = (
+            source_type == "external_official"
+            or retriever == "official_catalog"
+            or any(
+                marker in f"{source} {title}".lower()
+                for marker in ("owasp", "cwe", "mitre", "mdn", "portswigger", "first.org", "cvss")
+            )
+        )
+        if not is_official or not title:
+            continue
+
+        key = (title.lower(), source.lower())
+        if key in seen:
+            continue
+        seen.add(key)
+        references.append(
+            {
+                "title": title,
+                "source": source or "-",
+                "retriever": retriever or source_type or "official_catalog",
+                "score": item.get("score", "-"),
+            }
+        )
+
+    return references
+
+
+def assess_xss_risk(
+    finding: Dict[str, Any],
+    rag_contexts: Any = None,
+) -> Dict[str, Any]:
+    """
+    Evidence-driven XSS risk assessment.
+
+    This is not a full CVSS calculator. It uses OWASP's likelihood/impact
+    model and CVSS qualitative severity bands as a repeatable report scoring
+    policy, with matched official RAG references stored as supporting basis.
+    """
+
+    finding = finding or {}
+    evidence = _safe(finding.get("evidence"), "")
+    payload = _safe(finding.get("payload"), "")
+    target_url = _safe(finding.get("target_url") or finding.get("url"), "")
+    method = _safe(finding.get("method") or finding.get("http_method"), "").upper()
+    title = _safe(finding.get("title"), "")
+    description = _safe(finding.get("description"), "")
+    xss_type = _safe(finding.get("xss_type"), "").lower()
+    confidence = _normalize_confidence(finding.get("confidence"))
+    reflection = _as_dict(finding.get("reflection_detected"))
+    verification = _safe(reflection.get("verification") or finding.get("verification"), "")
+
+    combined = " ".join([evidence, payload, target_url, title, description, verification]).lower()
+
+    reflected = bool(reflection.get("detected")) or bool(finding.get("reflected"))
+    if not reflected:
+        reflected = _contains_any(
+            combined,
+            [
+                "payload_reflected",
+                "direct_url_payload_reflected",
+                "reflected_value=",
+                "payload already present",
+                "reflected in http response",
+            ],
+        )
+
+    script_payload = _contains_any(payload, ["<script", "javascript:", "onerror=", "onload=", "alert("])
+    browser_execution = _contains_any(
+        combined,
+        [
+            "browser_dom_execution",
+            "browser_dom_execution_or_injection",
+            "dom_based",
+            "alert observed",
+            "javascript execution",
+            "executed as javascript",
+        ],
+    )
+    execution_like = browser_execution or (reflected and script_payload)
+    stored = xss_type == "stored" or "stored xss" in combined or "persistent xss" in combined
+    dom_based = xss_type in {"dom", "dom_based"} or "dom xss" in combined or "dom-based" in combined
+    url_parameter = method == "GET" and "?" in target_url
+    sensitive_surface = _contains_any(
+        combined,
+        [
+            "admin",
+            "session",
+            "cookie",
+            "token",
+            "jwt",
+            "authorization",
+            "account",
+            "profile",
+            "payment",
+            "credential",
+            "authenticated",
+        ],
+    )
+
+    likelihood_score = 1
+    impact_score = 1
+    basis: List[str] = []
+
+    if reflected:
+        likelihood_score += 3
+        basis.append("Payload reflection was observed, increasing exploit likelihood.")
+    if script_payload:
+        likelihood_score += 1
+        impact_score += 2
+        basis.append("The payload contains script-capable input, increasing client-side impact.")
+    if execution_like:
+        likelihood_score += 2
+        impact_score += 2
+        basis.append("The evidence indicates executable JavaScript risk, not only passive reflection.")
+    if url_parameter:
+        likelihood_score += 1
+        basis.append("The vulnerable input is reachable through a GET URL parameter.")
+    if confidence in {"FIRM", "HIGH", "CONFIRMED"}:
+        likelihood_score += 1
+        basis.append("Scanner confidence is firm/high, so the finding is treated as verified evidence.")
+    if dom_based:
+        likelihood_score += 1
+        impact_score += 1
+        basis.append("DOM-based handling can expose unsafe client-side sinks.")
+    if stored:
+        likelihood_score += 1
+        impact_score += 4
+        basis.append("Stored/persistent XSS can affect users repeatedly without a crafted one-off URL.")
+    if sensitive_surface:
+        impact_score += 2
+        basis.append("The affected surface mentions session, token, admin, account, or other sensitive context.")
+
+    if not reflected and not execution_like:
+        likelihood_score = min(likelihood_score, 2)
+        impact_score = min(impact_score, 2)
+        basis.append("No confirmed reflection or JavaScript execution evidence was found.")
+
+    likelihood_score = max(0, min(9, likelihood_score))
+    impact_score = max(0, min(9, impact_score))
+
+    likelihood = _score_level(likelihood_score)
+    impact = _score_level(impact_score)
+    risk_score = _risk_score_from_likelihood_impact(likelihood_score, impact_score)
+    severity = _severity_from_risk_score(risk_score)
+
+    basis.append(
+        "Risk score is calculated first from OWASP-style likelihood and impact scores "
+        f"using 45% likelihood and 55% impact weighting: {risk_score}/100."
+    )
+    basis.append(
+        "Severity is then assigned from the score range: Critical 90-100, "
+        "High 70-89, Medium 40-69, Low 10-39, Info 0-9."
+    )
+
+    reference_basis = _extract_rag_reference_basis(rag_contexts)
+    if reference_basis:
+        basis.append(
+            "Hybrid RAG matched official references used as supporting rationale: "
+            + ", ".join(ref["title"] for ref in reference_basis[:4])
+            + "."
+        )
+
+    source_severity = _normalize_severity(
+        finding.get("scanner_reported_severity") or finding.get("severity")
+    )
+    if source_severity not in {"UNKNOWN", severity}:
+        basis.append(
+            f"Scanner-provided severity was {source_severity}; the report severity was recalculated from evidence."
+        )
 
     return {
         "severity": severity,
-        "risk_score": score_map.get(severity, 50),
-        "likelihood": likelihood_map.get(severity, "Unknown"),
-        "impact": impact_map.get(severity, "Unknown"),
+        "risk_score": risk_score,
+        "likelihood": likelihood,
+        "impact": "Critical" if severity == "CRITICAL" else impact,
+        "owasp_likelihood_score": likelihood_score,
+        "owasp_impact_score": impact_score,
+        "severity_source": "risk_score_first_evidence_and_rag_supported",
+        "score_scale": (
+            "0-100 normalized report score. Severity is assigned from CVSS-inspired "
+            "qualitative bands; this is not a formal CVSS vector."
+        ),
+        "scanner_reported_severity": source_severity,
+        "reference_basis": reference_basis,
+        "scoring_basis": basis,
         "business_impact": (
-            "An attacker may execute arbitrary JavaScript in a victim browser, "
+            "Stored or sensitive-context XSS can repeatedly execute attacker-controlled JavaScript "
+            "for affected users and may expose session data, tokens, privileged actions, or page integrity."
+            if severity == "CRITICAL"
+            else "An attacker may execute arbitrary JavaScript in a victim browser, "
             "steal session data, perform actions as the user, or manipulate page content."
             if severity in {"CRITICAL", "HIGH", "MEDIUM"}
             else "Potential client-side security weakness requiring validation."
         ),
     }
+
+
+def calculate_risk(finding: Dict[str, Any]) -> Dict[str, Any]:
+    return assess_xss_risk(finding)
+
+
+def apply_rag_supported_risk(
+    finding: Dict[str, Any],
+    rag_contexts: Any,
+) -> Dict[str, Any]:
+    finding = dict(finding or {})
+    risk = assess_xss_risk(finding, rag_contexts=rag_contexts)
+    finding["risk"] = risk
+    finding["severity"] = risk["severity"]
+    finding.setdefault("report_fields", {})
+    if isinstance(finding["report_fields"], dict):
+        finding["report_fields"]["severity"] = risk["severity"]
+    finding.setdefault("rag_hints", {})
+    if isinstance(finding["rag_hints"], dict):
+        finding["rag_hints"]["severity"] = risk["severity"]
+    return finding
 
 
 def _build_rag_hints(finding: Dict[str, Any]) -> Dict[str, Any]:
@@ -232,6 +477,8 @@ def _build_rag_hints(finding: Dict[str, Any]) -> Dict[str, Any]:
         "severity": _normalize_severity(finding.get("severity")),
         "recommended_docs": _recommended_docs_for_xss(),
         "official_references": [
+            "OWASP Risk Rating Methodology",
+            "FIRST CVSS Qualitative Severity Rating Scale",
             "OWASP XSS Prevention Cheat Sheet",
             "CWE-79",
             "MDN XSS",
@@ -240,6 +487,9 @@ def _build_rag_hints(finding: Dict[str, Any]) -> Dict[str, Any]:
         "query_terms": [
             "XSS",
             "CWE-79",
+            "OWASP risk rating",
+            "likelihood impact severity",
+            "CVSS qualitative severity",
             "reflected XSS",
             "output encoding",
             "context-aware escaping",
@@ -401,6 +651,7 @@ def normalize_xss_finding(
         "owasp_category": "Injection / Cross-Site Scripting",
 
         "severity": severity,
+        "scanner_reported_severity": severity,
         "confidence": confidence,
 
         "target_url": target_url,
@@ -431,6 +682,7 @@ def normalize_xss_finding(
     }
 
     normalized["risk"] = calculate_risk(normalized)
+    normalized["severity"] = normalized["risk"]["severity"]
     normalized["rag_hints"] = _build_rag_hints(normalized)
     normalized["report_fields"] = _build_report_fields(normalized)
 
